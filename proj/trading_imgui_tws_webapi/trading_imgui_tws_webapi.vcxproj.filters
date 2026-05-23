@@ -8,6 +8,12 @@
     <Filter Include="backends">
       <UniqueIdentifier>{674f7325-0221-404b-8ed2-f4fb52773a14}</UniqueIdentifier>
     </Filter>
+    <Filter Include="naett">
+      <UniqueIdentifier>{efae7288-27c9-4a07-bda0-8e058eb1bd0f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="parson">
+      <UniqueIdentifier>{8dc7019d-d822-43b8-8b24-792b696bfd0d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\..\src\imgui.natvis" />
@@ -35,6 +41,13 @@
       <Filter>backends</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\main.cpp" />
+    <ClCompile Include="..\..\src\naett\naett.c">
+      <Filter>naett</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\trading_imgui.cpp" />
+    <ClCompile Include="..\..\src\parson\parson.c">
+      <Filter>parson</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\src\imgui.natstepfilter" />
@@ -63,6 +76,13 @@
     </ClInclude>
     <ClInclude Include="..\..\src\backends\imgui_impl_win32.h">
       <Filter>backends</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\naett\naett.h">
+      <Filter>naett</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\trading_imgui.h" />
+    <ClInclude Include="..\..\src\parson\parson.h">
+      <Filter>parson</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

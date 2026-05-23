@@ -140,7 +140,13 @@ int main(int, char**)
 
         if (gConnectionState == 0)
         {
-          ConnectingState();
+          bool connected = ConnectingState();
+          if (connected)
+            gConnectionState = 1;
+        }
+        else
+        {
+
         }
         
 

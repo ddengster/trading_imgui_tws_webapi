@@ -3,4 +3,4 @@
 
 #include "imgui.h"
 
-void ConnectingState();
+bool ConnectingState();

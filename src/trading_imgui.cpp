@@ -7,11 +7,12 @@
 #include <shellapi.h>
 
 #include "naett/naett.h"
+#include "parson/parson.h"
 
 naettReq* gStatusReq = nullptr;
 naettRes* gStatusRes = nullptr;
 
-void ConnectingState()
+bool ConnectingState()
 {
   ImGui::Begin("Connecting", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
   ImGui::NewLine();
@@ -37,6 +38,7 @@ void ConnectingState()
 
   static int statuscode = -1;
   static bool done = false;
+  
   if (gStatusRes)
   {
     if (naettComplete(gStatusRes))
@@ -45,9 +47,23 @@ void ConnectingState()
       statuscode = naettGetStatus(gStatusRes);
       
       if (statuscode == 200)
-        done = true;
-      else
       {
+        int sz = 0;
+        const void* body = naettGetBody(gStatusRes, &sz);
+        JSON_Value* val = json_parse_string((const char*)body);
+        JSON_Object* obj = json_value_get_object(val);
+        int b = json_object_get_boolean(obj, "authenticated");
+        if (b)
+        {
+          naettFree(gStatusReq);
+          naettClose(gStatusRes);
+          done = true;
+        }
+      }
+
+      if (!done)
+      {
+        // retry
         naettFree(gStatusReq);
         naettClose(gStatusRes);
         gStatusRes = nullptr;
@@ -59,4 +75,5 @@ void ConnectingState()
   ImGui::Text("statuscode: %d", statuscode);
 
   ImGui::End();
+  return done;
 }
