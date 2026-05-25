@@ -68,7 +68,7 @@ void PortfolioUI()
       posRefreshTimer = 0.0f;
     }
   }
-  
+
   if (!sumDone)
   {
     int r = PollLedger(gAccountId, summary);
@@ -250,14 +250,15 @@ void MainState()
     ImGui::SetNextWindowSize(ImVec2(300, 200), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowPos(ImVec2(800, 0), ImGuiCond_FirstUseEver);
     ImGui::Begin("Contract Search");
-    
+
     static std::string ticker_result = "";
     static std::vector<ExchContractId> conids;
     static std::string full_stockname;
     static char symbol[64] = {0};
     bool changed =
       ImGui::InputText("Symbol", symbol, sizeof(symbol),
-                       ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_EscapeClearsAll);
+                       ImGuiInputTextFlags_CharsUppercase | ImGuiInputTextFlags_EnterReturnsTrue |
+                         ImGuiInputTextFlags_EscapeClearsAll);
     if (changed)
     {
       ticker_result = symbol;
@@ -271,9 +272,9 @@ void MainState()
 
     ImGui::Separator();
     ImGui::NewLine();
-    ImGui::TextColored(ImVec4(0, 1, 0, 1), "%s", ticker_result.c_str());
+    ImGui::TextColored(ImVec4(0, 1, 0, 1), "Contract search for: %s", ticker_result.c_str());
 
-    if (ImGui::BeginTable("split", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable))
+    if (ImGui::BeginTable("Contract search", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable))
     {
       ImGui::TableSetupColumn("Name");
       ImGui::TableSetupColumn("Exchange");
@@ -297,18 +298,13 @@ void MainState()
         ImGui::TableNextColumn();
 
         ImGui::PushID(i);
-        if (ImGui::Button("Add"))
+        if (ImGui::Button("Add", ImVec2(-1.f, 30.f)))
         {
           chartheaders.push_back({c.conid, symbol, c.exchange});
         }
         ImGui::PopID();
       }
       ImGui::EndTable();
-    }
-
-    for (auto &c : conids)
-    {
-      ImGui::Text("%s %d", c.exchange.c_str(), c.conid);
     }
 
     ImGui::End();
