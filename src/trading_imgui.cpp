@@ -200,7 +200,7 @@ void MainState()
   };
   static const int max_concurrent_charts = 5;
   static std::string graphs[max_concurrent_charts];
-  static int concurrent_chart_count = 0;
+  static int concurrent_chart_count = 3;
   static std::vector<ChartHeader> chartheaders;
 
   if (ImGui::BeginMainMenuBar())
@@ -215,7 +215,7 @@ void MainState()
     {
       ImGui::Checkbox("Fresh order window", &fresh_order_window);
       ImGui::Checkbox("Contract Info window", &contracts_search_window);
-      ImGui::DragInt("Max Concurrent Graphs", &concurrent_chart_count, 1, 1, 5);
+      ImGui::DragInt("Max Concurrent Graphs", &concurrent_chart_count, 1, 1, max_concurrent_charts);
       ImGui::EndMenu();
     }
 
