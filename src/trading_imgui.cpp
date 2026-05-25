@@ -28,9 +28,13 @@ bool ConnectingState()
   }
 
   static int statuscode = -1;
-  int result = PollAuthStatus(statuscode);
+  static bool auth = false;
+  int result = PollAuthStatus(statuscode, auth);
 
-  ImGui::Text("statuscode: %d", statuscode);
+  if (statuscode != 200)
+    ImGui::Text("statuscode: %d", statuscode);
+  else
+    ImGui::Text("statuscode: %d (auth: %d)", statuscode, auth ? 1 : 0);
 
   ImGui::End();
   return result == 1;
@@ -42,14 +46,29 @@ void PortfolioUI()
   static SummaryData summary;
   static bool posDone = false;
   static bool sumDone = false;
+  static float posRefreshTimer = -1.0f;
 
-  if (!posDone)
+  if (posRefreshTimer < 0.f)
   {
     int r = PollPositions(gAccountId, positions);
     if (r == 1)
+    {
       posDone = true;
+      posRefreshTimer = 0.0f;
+    }
   }
+  else
+  {
+    posRefreshTimer += ImGui::GetIO().DeltaTime;
+    PollPositions(gAccountId, positions);
 
+    if (posRefreshTimer >= 5.0f)
+    {
+      PollPositions(gAccountId, positions, true);
+      posRefreshTimer = 0.0f;
+    }
+  }
+  
   if (!sumDone)
   {
     int r = PollLedger(gAccountId, summary);

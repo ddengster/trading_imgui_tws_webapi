@@ -8,7 +8,7 @@
 #include "parson/parson.h"
 #include "naett/naett.h"
 
-int PollAuthStatus(int& out_statuscode)
+int PollAuthStatus(int& out_statuscode, bool& auth)
 {
   static naettReq* req = nullptr;
   static naettRes* res = nullptr;
@@ -34,6 +34,7 @@ int PollAuthStatus(int& out_statuscode)
       JSON_Value* val = json_parse_string((const char*)body);
       JSON_Object* obj = json_value_get_object(val);
       int authenticated = json_object_get_boolean(obj, "authenticated");
+      auth = authenticated ? true : false; 
       json_value_free(val);
 
       naettFree(req);
@@ -117,6 +118,7 @@ int PollPositions(const std::string& accountId, std::vector<PositionData>& out_p
 
   if (req == nullptr)
   {
+    //@note: only 1 page, given 30 positions per page
     char url[256];
     snprintf(url, sizeof(url), "https://localhost:5000/v1/api/portfolio/%s/positions/%d",
              accountId.c_str(), page);
@@ -132,6 +134,7 @@ int PollPositions(const std::string& accountId, std::vector<PositionData>& out_p
     int status = naettGetStatus(res);
     if (status == 200)
     {
+      out_positions.clear();
       int sz = 0;
       const void* body = naettGetBody(res, &sz);
       JSON_Value* val = json_parse_string((const char*)body);
@@ -175,15 +178,11 @@ int PollPositions(const std::string& accountId, std::vector<PositionData>& out_p
         out_positions.push_back(pd);
       }
       json_value_free(val);
-
-      if (n > 0)
-        page++;
-      else
-        complete = true;
+      complete = true;
     }
     else
     {
-      complete = true;
+      complete = false;
     }
 
     naettFree(req);
