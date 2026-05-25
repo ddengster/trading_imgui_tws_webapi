@@ -8,6 +8,56 @@
 #include "parson/parson.h"
 #include "naett/naett.h"
 
+/** @todo: planned coroutine implementation
+  
+  // utility functions
+
+  CreateCoroutine(std::function<void(mco_coro*)> co_func)
+  {
+    mco_desc desc = mco_desc_init(co_func, 0);
+    desc.user_data = ;
+
+    mco_coro* co = nullptr;
+    mco_result res = mco_create(&co, &desc);
+    ASSERTLOG(res == MCO_SUCCESS, "Failed to make coroutine");
+
+    return co;
+  }
+
+  // main update loop resuming coroutines before everything else
+
+  // one of our polling functions, e.g. PollAuthStatus
+  auto f = [](mco_coro* co)
+  {
+    naettRequestWithOptions;
+
+    res = naettMake(req);
+
+    yield_until(naettComplete(res));
+
+    int status = naettGetStatus(res);
+
+    const void* body = naettGetBody(res, &sz);
+    JSON_Value* val = json_parse_string((const char*)body);
+    JSON_Array* arr = json_value_get_array(val);
+    int n = json_array_get_count(arr);
+
+  };
+  
+  // in main update loop
+  static int coroutine_id = -1;
+  if (coroutine_id == -1)
+  {
+    coroutine_id = CreateCoroutine(f);
+  }
+  else
+  {
+    co = GetCoroutine(coroutine_id);
+    if (co->ErrorCode())
+      coroutine_id = -1;  // try again next frame
+  }
+
+**/
 int PollAuthStatus(int& out_statuscode, bool& auth)
 {
   static naettReq* req = nullptr;

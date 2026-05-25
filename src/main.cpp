@@ -14,6 +14,9 @@
 #include "naett/naett.h"
 #include "trading_imgui.h"
 
+#define MINICORO_IMPL
+#include "coroutine/minicoro.h"
+
 // Trading Data
 int gConnectionState = 0; // 
 
