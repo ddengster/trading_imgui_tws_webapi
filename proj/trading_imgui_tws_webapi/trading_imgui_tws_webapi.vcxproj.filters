@@ -48,6 +48,7 @@
     <ClCompile Include="..\..\src\parson\parson.c">
       <Filter>parson</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\im_api.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\src\imgui.natstepfilter" />
@@ -85,5 +86,6 @@
     <ClInclude Include="..\..\src\parson\parson.h">
       <Filter>parson</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\im_api.h" />
   </ItemGroup>
 </Project>

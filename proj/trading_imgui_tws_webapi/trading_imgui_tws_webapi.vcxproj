@@ -29,6 +29,7 @@
     <ClCompile Include="..\..\src\imgui\imgui_draw.cpp" />
     <ClCompile Include="..\..\src\imgui\imgui_tables.cpp" />
     <ClCompile Include="..\..\src\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="..\..\src\im_api.cpp" />
     <ClCompile Include="..\..\src\main.cpp" />
     <ClCompile Include="..\..\src\naett\naett.c" />
     <ClCompile Include="..\..\src\parson\parson.c" />
@@ -47,6 +48,7 @@
     <ClInclude Include="..\..\src\imgui\imstb_rectpack.h" />
     <ClInclude Include="..\..\src\imgui\imstb_textedit.h" />
     <ClInclude Include="..\..\src\imgui\imstb_truetype.h" />
+    <ClInclude Include="..\..\src\im_api.h" />
     <ClInclude Include="..\..\src\naett\naett.h" />
     <ClInclude Include="..\..\src\parson\parson.h" />
     <ClInclude Include="..\..\src\trading_imgui.h" />
