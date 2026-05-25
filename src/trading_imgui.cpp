@@ -119,9 +119,9 @@ void PortfolioUI()
       ImGui::TableNextRow();
 
       ImGui::TableNextColumn();
-      ImGui::Text(p.symbol.c_str());
+      ImGui::TextWrapped(p.secType.c_str());
       ImGui::TableNextColumn();
-      ImGui::Text(p.secType.c_str());
+      ImGui::Text(p.assetClass.c_str());
       ImGui::TableNextColumn();
 
       char t[128] = {0};

@@ -150,25 +150,20 @@ int PollPositions(const std::string& accountId, std::vector<PositionData>& out_p
         double mktValue = json_object_get_number(obj, "mktValue");
         double realizedPnl = json_object_get_number(obj, "realizedPnl");
         double unrealizedPnl = json_object_get_number(obj, "unrealizedPnl");
-
+        const char* assetclass = json_object_get_string(obj, "assetClass");
+        
         std::string desc = contractDesc ? contractDesc : "";
-        std::string symbol, secType;
+        std::string symbol;
         size_t firstSpace = desc.find(' ');
         if (firstSpace != std::string::npos)
-        {
           symbol = desc.substr(0, firstSpace);
-          size_t secondSpace = desc.find(' ', firstSpace + 1);
-          if (secondSpace != std::string::npos)
-            secType = desc.substr(firstSpace + 1, secondSpace - firstSpace - 1);
-          else
-            secType = desc.substr(firstSpace + 1);
-        }
         else
           symbol = desc;
 
         PositionData pd;
         pd.symbol = symbol;
-        pd.secType = secType;
+        pd.secType = contractDesc;
+        pd.assetClass = assetclass;
         pd.size = position;
         pd.averageCost = avgCost;
         pd.marketPrice = mktPrice;

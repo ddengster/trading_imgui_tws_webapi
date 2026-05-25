@@ -9,6 +9,7 @@ struct PositionData
 {
   std::string symbol;
   std::string secType;
+  std::string assetClass;
   double size;
   double averageCost;
   double marketPrice;
