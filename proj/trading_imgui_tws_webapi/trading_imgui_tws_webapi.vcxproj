@@ -42,6 +42,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\src\backends\imgui_impl_dx11.h" />
     <ClInclude Include="..\..\src\backends\imgui_impl_win32.h" />
+    <ClInclude Include="..\..\src\coroutine\minicoro.h" />
     <ClInclude Include="..\..\src\imgui\imconfig.h" />
     <ClInclude Include="..\..\src\imgui\imgui.h" />
     <ClInclude Include="..\..\src\imgui\imgui_internal.h" />

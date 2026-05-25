@@ -189,7 +189,18 @@ void MainState()
   static int todays_sizing = 100;
   static int target_max_loss = 100;
   static bool fresh_order_window = true;
-  static bool contracts_info_window = true;
+  static bool contracts_search_window = true;
+
+  struct ChartHeader
+  {
+    int mConnId = 0;
+    std::string mTicker;
+    std::string mExchange;
+  };
+  static const int num_concurrent_graphs = 5;
+  static std::string graphs[num_concurrent_graphs];
+  static int concurrent_graph_count = 0;
+  static std::vector<ChartHeader> chartheaders;
 
   if (ImGui::BeginMainMenuBar())
   {
@@ -202,7 +213,7 @@ void MainState()
     if (ImGui::BeginMenu("Windows"))
     {
       ImGui::Checkbox("Fresh order window", &fresh_order_window);
-      ImGui::Checkbox("Contract Info window", &contracts_info_window);
+      ImGui::Checkbox("Contract Info window", &contracts_search_window);
       ImGui::EndMenu();
     }
 
@@ -232,5 +243,74 @@ void MainState()
   if (!gAccountId.empty())
   {
     PortfolioUI();
+  }
+
+  if (contracts_search_window)
+  {
+    ImGui::SetNextWindowSize(ImVec2(300, 200), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowPos(ImVec2(800, 0), ImGuiCond_FirstUseEver);
+    ImGui::Begin("Contract Search");
+    
+    static std::string ticker_result = "";
+    static std::vector<ExchContractId> conids;
+    static std::string full_stockname;
+    static char symbol[64] = {0};
+    bool changed =
+      ImGui::InputText("Symbol", symbol, sizeof(symbol),
+                       ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_EscapeClearsAll);
+    if (changed)
+    {
+      ticker_result = symbol;
+      PollConId(symbol, conids, true);
+    }
+    else
+    {
+      static long long conid = -1;
+      int ret = PollConId(symbol, conids);
+    }
+
+    ImGui::Separator();
+    ImGui::NewLine();
+    ImGui::TextColored(ImVec4(0, 1, 0, 1), "%s", ticker_result.c_str());
+
+    if (ImGui::BeginTable("split", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable))
+    {
+      ImGui::TableSetupColumn("Name");
+      ImGui::TableSetupColumn("Exchange");
+      ImGui::TableSetupColumn("Conid");
+      ImGui::TableSetupColumn("Ops");
+
+      ImGui::TableHeadersRow();
+
+      for (int i = 0; i < (int)conids.size(); ++i)
+      {
+        auto& c = conids[i];
+
+        ImGui::TableNextRow();
+
+        ImGui::TableNextColumn();
+        ImGui::TextWrapped(c.full_stockname.c_str());
+        ImGui::TableNextColumn();
+        ImGui::TextWrapped(c.exchange.c_str());
+        ImGui::TableNextColumn();
+        ImGui::Text("%d", c.conid);
+        ImGui::TableNextColumn();
+
+        ImGui::PushID(i);
+        if (ImGui::Button("Add"))
+        {
+          chartheaders.push_back({c.conid, symbol, c.exchange});
+        }
+        ImGui::PopID();
+      }
+      ImGui::EndTable();
+    }
+
+    for (auto &c : conids)
+    {
+      ImGui::Text("%s %d", c.exchange.c_str(), c.conid);
+    }
+
+    ImGui::End();
   }
 }

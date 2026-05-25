@@ -14,6 +14,9 @@
     <Filter Include="parson">
       <UniqueIdentifier>{8dc7019d-d822-43b8-8b24-792b696bfd0d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="coroutine">
+      <UniqueIdentifier>{206e5b91-395e-4f65-a6c1-396ab867bcb3}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\..\src\imgui.natvis" />
@@ -87,5 +90,8 @@
       <Filter>parson</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\im_api.h" />
+    <ClInclude Include="..\..\src\coroutine\minicoro.h">
+      <Filter>coroutine</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
