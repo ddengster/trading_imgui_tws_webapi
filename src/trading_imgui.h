@@ -4,3 +4,4 @@
 #include "imgui.h"
 
 bool ConnectingState();
+void MainState();

@@ -51,6 +51,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\src\imgui.natstepfilter" />
+    <None Include="..\..\src\.clang-format" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\imgui\imgui_internal.h">
