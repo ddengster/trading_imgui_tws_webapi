@@ -4,6 +4,7 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+
 #include <shellapi.h>
 
 #include <stdio.h>
@@ -197,9 +198,9 @@ void MainState()
     std::string mTicker;
     std::string mExchange;
   };
-  static const int num_concurrent_graphs = 5;
-  static std::string graphs[num_concurrent_graphs];
-  static int concurrent_graph_count = 0;
+  static const int max_concurrent_charts = 5;
+  static std::string graphs[max_concurrent_charts];
+  static int concurrent_chart_count = 0;
   static std::vector<ChartHeader> chartheaders;
 
   if (ImGui::BeginMainMenuBar())
@@ -214,6 +215,7 @@ void MainState()
     {
       ImGui::Checkbox("Fresh order window", &fresh_order_window);
       ImGui::Checkbox("Contract Info window", &contracts_search_window);
+      ImGui::DragInt("Max Concurrent Graphs", &concurrent_chart_count, 1, 1, 5);
       ImGui::EndMenu();
     }
 
@@ -274,7 +276,8 @@ void MainState()
     ImGui::NewLine();
     ImGui::TextColored(ImVec4(0, 1, 0, 1), "Contract search for: %s", ticker_result.c_str());
 
-    if (ImGui::BeginTable("Contract search", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable))
+    if (ImGui::BeginTable("Contract search", 4,
+                          ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable))
     {
       ImGui::TableSetupColumn("Name");
       ImGui::TableSetupColumn("Exchange");
@@ -300,11 +303,56 @@ void MainState()
         ImGui::PushID(i);
         if (ImGui::Button("Add", ImVec2(-1.f, 30.f)))
         {
-          chartheaders.push_back({c.conid, symbol, c.exchange});
+          // no repeats
+          bool found = false;
+          for (int j = 0; j < chartheaders.size(); ++j)
+          {
+            if (chartheaders[j].mConnId == c.conid)
+            {
+              found = true;
+              break;
+            }
+          }
+          if (!found)
+            chartheaders.push_back({c.conid, symbol, c.exchange});
         }
         ImGui::PopID();
       }
       ImGui::EndTable();
+    }
+
+    ImGui::End();
+  }
+
+  // stock charts
+  for (int i = 0; i < concurrent_chart_count; ++i)
+  {
+
+    ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowPos(ImVec2(0, 400 + i * 300), ImGuiCond_FirstUseEver);
+
+    char title[128] = {0};
+    snprintf(title, sizeof(title), "Chart #%d", i + 1);
+    ImGui::Begin(title);
+
+    if (ImGui::BeginTabBar("ChartTabs"))
+    {
+      for (int n = 0; n < (int)chartheaders.size(); n++)
+      {
+        bool open = true;
+        if (ImGui::BeginTabItem(chartheaders[n].mTicker.c_str(), &open))
+        {
+          ImGui::Text("ConId: %d", chartheaders[n].mConnId);
+          ImGui::Text("Exchange: %s", chartheaders[n].mExchange.c_str());
+          ImGui::EndTabItem();
+        }
+        if (!open)
+        {
+          chartheaders.erase(chartheaders.begin() + n);
+          n--;
+        }
+      }
+      ImGui::EndTabBar();
     }
 
     ImGui::End();
