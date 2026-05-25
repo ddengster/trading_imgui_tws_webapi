@@ -15,13 +15,6 @@
 
 static std::string gAccountId;
 
-struct SummaryData
-{
-  double cashUSD;
-  double cashSGD;
-  double netLiquidationValSGD;
-};
-
 static int PollAuthStatus(int& out_statuscode)
 {
   static naettReq* req = nullptr;
@@ -116,19 +109,7 @@ static int PollAccountId(std::string& out_accountId)
   return 0;
 }
 
-struct PositionData
-{
-  std::string symbol;
-  std::string secType;
-  double size;
-  double averageCost;
-  double marketPrice;
-  double marketValue;
-  double realizedPNL;
-  double unrealizedPNL;
-};
-
-static int PollPositions(const std::string& accountId, std::vector<PositionData>& out_positions)
+int PollPositions(const std::string& accountId, std::vector<PositionData>& out_positions)
 {
   static naettReq* req = nullptr;
   static naettRes* res = nullptr;
@@ -218,7 +199,7 @@ static int PollPositions(const std::string& accountId, std::vector<PositionData>
   return complete ? 1 : 0;
 }
 
-static int PollLedger(const std::string& accountId, SummaryData& out_summary)
+int PollLedger(const std::string& accountId, SummaryData& out_summary)
 {
   static naettReq* req = nullptr;
   static naettRes* res = nullptr;
@@ -260,6 +241,59 @@ static int PollLedger(const std::string& accountId, SummaryData& out_summary)
       cashObj = json_object_get_object(obj, "BASE");
       if (cashObj)
         out_summary.netLiquidationValSGD = json_object_get_number(cashObj, "netliquidationvalue");
+
+      json_value_free(val);
+      done = true;
+    }
+    else
+    {
+      done = true;
+    }
+
+    naettFree(req);
+    naettClose(res);
+    req = nullptr;
+    res = nullptr;
+  }
+
+  return done ? 1 : 0;
+}
+
+
+int PollSummary(const std::string& accountId, SummaryData& out_summary)
+{
+  static naettReq* req = nullptr;
+  static naettRes* res = nullptr;
+  static bool done = false;
+
+  if (done)
+    return 1;
+
+  if (req == nullptr)
+  {
+    char url[256];
+    snprintf(url, sizeof(url), "https://localhost:5000/v1/api/portfolio/%s/summary",
+             accountId.c_str());
+    naettOption* options[] = {naettMethod("GET")};
+    req = naettRequestWithOptions(url, sizeof(options) / sizeof(options[0]),
+                                  (const naettOption**)&options);
+    res = naettMake(req);
+    return 0;
+  }
+
+  if (res && naettComplete(res))
+  {
+    int status = naettGetStatus(res);
+    if (status == 200)
+    {
+      int sz = 0;
+      const void* body = naettGetBody(res, &sz);
+      JSON_Value* val = json_parse_string((const char*)body);
+      JSON_Object* obj = json_value_get_object(val);
+
+      JSON_Object* cashObj = json_object_get_object(obj, "buyingpower");
+      if (cashObj)
+        out_summary.buyingPowerSGD = json_object_get_number(cashObj, "amount");
 
       json_value_free(val);
       done = true;
@@ -322,6 +356,7 @@ void PortfolioUI()
     if (r == 1)
       sumDone = true;
   }
+  PollSummary(gAccountId, summary);
 
   ImGui::SetNextWindowSize(ImVec2(800, 400), ImGuiCond_FirstUseEver);
   ImGui::SetNextWindowPos(ImVec2(0, 400), ImGuiCond_FirstUseEver);
@@ -331,7 +366,7 @@ void PortfolioUI()
   {
     ImGui::Text("Cash Balance Total SGD: %g  USD: %g  NetLiq(SGD): %g", summary.cashSGD,
                 summary.cashUSD, summary.netLiquidationValSGD);
-    // ImGui::Text("Buying Power SGD: %s", summary.buyingPowerSGD.c_str());
+    ImGui::Text("Buying Power SGD: %g", summary.buyingPowerSGD);
   }
   else
   {
