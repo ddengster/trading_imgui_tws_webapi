@@ -14,6 +14,7 @@
 #include <ctime>
 #include <unordered_map>
 
+#include "coroutine/coroutine_mgt.h"
 
 static std::string gAccountId;
 
@@ -33,16 +34,31 @@ bool ConnectingState()
   }
 
   static int statuscode = -1;
-  static bool auth = false;
-  int result = PollAuthStatus(statuscode, auth);
+  static int authenticated = 0;
+
+  static int coro_handle = -1;
+  if (coro_handle == -1)
+    coro_handle = create_managed_coroutine(PollAuthStatus);
+  else
+  {
+    mco_coro* co = get_coroutine(coro_handle);
+    if (co == nullptr || mco_status(co) == MCO_DEAD)
+    {
+      mco_pop(co, &authenticated, sizeof(authenticated));
+      mco_pop(co, &statuscode, sizeof(statuscode));
+
+      destroy_coroutine(coro_handle);
+      coro_handle = -1;
+    }
+  }
 
   if (statuscode != 200)
     ImGui::Text("statuscode: %d", statuscode);
   else
-    ImGui::Text("statuscode: %d (auth: %d)", statuscode, auth ? 1 : 0);
+    ImGui::Text("statuscode: %d (auth: %d)", statuscode, authenticated ? 1 : 0);
 
   ImGui::End();
-  return result == 1;
+  return statuscode == 200 && authenticated;
 }
 
 void PortfolioUI()

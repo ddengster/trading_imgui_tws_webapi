@@ -4,60 +4,63 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
+#include "coroutine/coroutine_mgt.h"
 #include "naett/naett.h"
 #include "parson/parson.h"
 #include <unordered_map>
 
-/** @todo: planned coroutine implementation
+void PollAuthStatus(mco_coro* co)
+{
+  naettReq* req = nullptr;
+  naettRes* res = nullptr;
 
-  // utility functions
+  naettOption* options[] = {naettMethod("GET")};
+  req =
+    naettRequestWithOptions("https://localhost:5000/v1/api/iserver/auth/status",
+                            sizeof(options) / sizeof(options[0]), (const naettOption**)&options);
+  res = naettMake(req);
 
-  CreateCoroutine(std::function<void(mco_coro*)> co_func)
+  if (!req || !res)
   {
-    mco_desc desc = mco_desc_init(co_func, 0);
-    desc.user_data = ;
-
-    mco_coro* co = nullptr;
-    mco_result res = mco_create(&co, &desc);
-    ASSERTLOG(res == MCO_SUCCESS, "Failed to make coroutine");
-
-    return co;
+    int ret = -1;
+    mco_push(co, &ret, sizeof(ret));
+    ret = 0;
+    mco_push(co, &ret, sizeof(ret));
+    return;
   }
 
-  // main update loop resuming coroutines before everything else
+  yield();
 
-  // one of our polling functions, e.g. PollAuthStatus
-  auto f = [](mco_coro* co)
+  auto isComplete = [](void* userdata)
   {
-    naettRequestWithOptions;
+    naettRes* res = static_cast<naettRes*>(userdata);
+    return naettComplete(res) != 0;
+  };
+  yield_until_true(isComplete, res);
 
-    res = naettMake(req);
-
-    yield_until(naettComplete(res));
-
-    int status = naettGetStatus(res);
-
+  int out_statuscode = naettGetStatus(res);
+  
+  int authenticated = 0;
+  if (out_statuscode == 200)
+  {
+    int sz = 0;
     const void* body = naettGetBody(res, &sz);
     JSON_Value* val = json_parse_string((const char*)body);
-    JSON_Array* arr = json_value_get_array(val);
-    int n = json_array_get_count(arr);
-
-  };
-
-  // in main update loop
-  static int coroutine_id = -1;
-  if (coroutine_id == -1)
-  {
-    coroutine_id = CreateCoroutine(f);
+    JSON_Object* obj = json_value_get_object(val);
+    authenticated = json_object_get_boolean(obj, "authenticated");
+    
+    json_value_free(val);
   }
-  else
-  {
-    co = GetCoroutine(coroutine_id);
-    if (co->ErrorCode())
-      coroutine_id = -1;  // try again next frame
-  }
+  
+  mco_push(co, &out_statuscode, sizeof(out_statuscode));
+  mco_push(co, &authenticated, sizeof(authenticated));
 
-**/
+  naettFree(req);
+  naettClose(res);
+  req = nullptr;
+  res = nullptr;
+}
+
 int PollAuthStatus(int& out_statuscode, bool& auth)
 {
   static naettReq* req = nullptr;

@@ -3,8 +3,10 @@
 #include "trading_imgui.h"
 #include <string>
 #include <vector>
+#include "coroutine/coroutine_mgt.h"
 
-int PollAuthStatus(int& out_statuscode, bool& auth);
+void PollAuthStatus(mco_coro* co);
+
 int PollAccountId(std::string& out_accountId);
 int PollPositions(const std::string& accountId, std::vector<PositionData>& out_positions,
                   bool force_reset = false);

@@ -62,3 +62,20 @@ void destroy_all_coroutines()
   }
   gCoroutineMgr.clear();
 }
+
+void yield()
+{
+  mco_yield(mco_running());
+}
+
+void yield_until_true(CoConditionalNoArg conditionalfunc)
+{
+  while (!conditionalfunc())
+    mco_yield(mco_running());
+}
+
+void yield_until_true(CoConditional conditionalfunc, void* userdata)
+{
+  while (!conditionalfunc(userdata))
+    mco_yield(mco_running());
+}

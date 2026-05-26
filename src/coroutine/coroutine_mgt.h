@@ -30,3 +30,11 @@ void destroy_coroutine(int handle);
 void process_coroutines();
 
 void destroy_all_coroutines();
+
+// coroutine control functions
+void yield();
+
+typedef bool (*CoConditionalNoArg)();
+typedef bool (*CoConditional)(void* userdata);
+void yield_until_true(CoConditionalNoArg conditionalfunc);
+void yield_until_true(CoConditional conditionalfunc, void* userdata);
