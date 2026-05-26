@@ -24,6 +24,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\src\backends\imgui_impl_dx11.cpp" />
     <ClCompile Include="..\..\src\backends\imgui_impl_win32.cpp" />
+    <ClCompile Include="..\..\src\coroutine\coroutine_mgt.cpp" />
     <ClCompile Include="..\..\src\imgui\imgui.cpp" />
     <ClCompile Include="..\..\src\imgui\imgui_demo.cpp" />
     <ClCompile Include="..\..\src\imgui\imgui_draw.cpp" />
@@ -45,6 +46,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\src\backends\imgui_impl_dx11.h" />
     <ClInclude Include="..\..\src\backends\imgui_impl_win32.h" />
+    <ClInclude Include="..\..\src\coroutine\coroutine_mgt.h" />
     <ClInclude Include="..\..\src\coroutine\minicoro.h" />
     <ClInclude Include="..\..\src\imgui\imconfig.h" />
     <ClInclude Include="..\..\src\imgui\imgui.h" />
