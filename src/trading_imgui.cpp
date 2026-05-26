@@ -235,7 +235,12 @@ void TickerTooltip(const std::vector<MarketDataPoint>& data, const std::vector<d
                    bool span_subplots = false)
 {
   ImDrawList* draw_list = ImPlot::GetPlotDrawList();
-  const double half_width = 24 * 60 * 60 * 0.25 * 1.5;
+
+  ImPlotRect limits = ImPlot::GetPlotLimits();
+  double plotwidth = limits.X.Max - limits.X.Min;
+  double widthperbar = plotwidth / (double)time.size();
+  double half_width = widthperbar * 0.5;
+
   const bool hovered = span_subplots ? ImPlot::IsSubplotsHovered() : ImPlot::IsPlotHovered();
   if (hovered)
   {
@@ -251,7 +256,12 @@ void TickerTooltip(const std::vector<MarketDataPoint>& data, const std::vector<d
     ImPlot::PopPlotClipRect();
     // find mouse location index
     int idx = BinarySearch(time.data(), 0, time.size() - 1, mouse.x);
+    /*
     printf("idx: %d\n", idx);
+    ImGui::BeginTooltip();
+    ImGui::Text("asdsa");
+    ImGui::EndTooltip();
+    */
     // render tool tip (won't be affected by plot clip rect)
     if (ImPlot::IsPlotHovered() && idx != -1)
     {
@@ -307,7 +317,7 @@ void PlotStockChart(const std::vector<MarketDataPoint>& data)
       ImPlot::SetupAxes(0, 0, ImPlotAxisFlags_NoTickLabels,
                         ImPlotAxisFlags_AutoFit | ImPlotAxisFlags_RangeFit |
                           ImPlotAxisFlags_Opposite);
-      ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
+      ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Linear);
       ImPlot::SetupAxisLimits(ImAxis_X1, data[0].timestamp, data.back().timestamp,
                               ImGuiCond_Always);
       ImPlot::SetupAxisFormat(ImAxis_X1, TimeStampFormatter, nullptr);
@@ -328,7 +338,7 @@ void PlotStockChart(const std::vector<MarketDataPoint>& data)
       {
         ImDrawList* draw_list = ImPlot::GetPlotDrawList();
         // calc real value width
-        const double half_width = 24 * 60 * 60 * 0.25;
+        const double half_width = time.size() > 1 ? (time[1] - time[0]) * 0.4 : 0;
         // begin plot item
         if (ImPlot::BeginItem("Stk"))
         {
@@ -350,6 +360,7 @@ void PlotStockChart(const std::vector<MarketDataPoint>& data)
             ImVec2 open_pos = ImPlot::PlotToPixels(data[i].timestamp - half_width, data[i].open);
             ImVec2 close_pos = ImPlot::PlotToPixels(data[i].timestamp + half_width, data[i].close);
             draw_list->AddRectFilled(open_pos, close_pos, color);
+
             ImVec2 low_pos = ImPlot::PlotToPixels(data[i].timestamp, data[i].low);
             ImVec2 high_pos = ImPlot::PlotToPixels(data[i].timestamp, data[i].high);
             draw_list->AddLine(low_pos, high_pos, color,
@@ -381,17 +392,18 @@ void PlotStockChart(const std::vector<MarketDataPoint>& data)
     {
       ImPlot::SetupAxes(
         0, 0, 0, ImPlotAxisFlags_AutoFit | ImPlotAxisFlags_RangeFit | ImPlotAxisFlags_Opposite);
-      ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Log10);
+      ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Linear);
       ImPlot::SetupAxisLimits(ImAxis_X1, time[0], time.back());
       ImPlot::SetupAxisFormat(ImAxis_X1, TimeStampFormatter, nullptr);
 
       ImPlot::SetupAxisFormat(ImAxis_Y1, VolumeFormatter, nullptr);
       TickerTooltip(data, time, true);
 
-      ImPlotSpec spec;
-      spec.FillColor = ImVec4(1.f, 0.75f, 0.25f, 1);
+      ImPlotRect limits = ImPlot::GetPlotLimits();
+      double plotwidth = limits.X.Max - limits.X.Min;
+      double widthperbar = plotwidth / (double)time.size();
 
-      ImPlot::PlotBars("Volume", time.data(), volume.data(), time.size(), 60 * 60 * 24 * 0.25);
+      ImPlot::PlotBars("Volume", time.data(), volume.data(), time.size(), widthperbar);
       ImPlot::EndPlot();
     }
 

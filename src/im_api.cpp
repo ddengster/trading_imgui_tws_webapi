@@ -383,7 +383,7 @@ int PollMarketDataHistory(int conid, std::vector<MarketDataPoint>& out_data, boo
     char url[512];
     snprintf(url, sizeof(url),
              "https://localhost:5000/v1/api/iserver/marketdata/"
-             "history?conid=%d&period=6h&bar=5min&outsideRth=true",
+             "history?conid=%d&period=2h&bar=5min&outsideRth=true",
              conid);
     naettOption* options[] = {naettMethod("GET")};
     s.req = naettRequestWithOptions(url, sizeof(options) / sizeof(options[0]),
