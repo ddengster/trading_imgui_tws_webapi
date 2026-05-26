@@ -14,8 +14,7 @@
 #include "naett/naett.h"
 #include "trading_imgui.h"
 
-#define MINICORO_IMPL
-#include "coroutine/minicoro.h"
+#include "coroutine/coroutine_mgt.h"
 
 #include "implot/implot.h"
 
@@ -145,6 +144,8 @@ int main(int, char**)
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
 
+        process_coroutines();
+
         if (gConnectionState == 0)
         {
           bool connected = ConnectingState();
@@ -175,6 +176,7 @@ int main(int, char**)
     }
 
     // Cleanup
+    destroy_all_coroutines();
     ImGui_ImplDX11_Shutdown();
     ImGui_ImplWin32_Shutdown();
     ImPlot::DestroyContext();

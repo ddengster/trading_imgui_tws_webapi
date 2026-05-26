@@ -14,6 +14,7 @@
 #include <ctime>
 #include <unordered_map>
 
+#include "coroutine/coroutine_mgt.h"
 
 static std::string gAccountId;
 
@@ -33,71 +34,156 @@ bool ConnectingState()
   }
 
   static int statuscode = -1;
-  static bool auth = false;
-  int result = PollAuthStatus(statuscode, auth);
+  static int authenticated = 0;
+
+  static int coro_handle = -1;
+  if (coro_handle == -1)
+    coro_handle = create_managed_coroutine(PollAuthStatus);
+  else
+  {
+    mco_coro* co = get_coroutine(coro_handle);
+    if (co == nullptr || mco_status(co) == MCO_DEAD)
+    {
+      mco_pop(co, &authenticated, sizeof(authenticated));
+      mco_pop(co, &statuscode, sizeof(statuscode));
+
+      destroy_coroutine(coro_handle);
+      coro_handle = -1;
+    }
+  }
 
   if (statuscode != 200)
     ImGui::Text("statuscode: %d", statuscode);
   else
-    ImGui::Text("statuscode: %d (auth: %d)", statuscode, auth ? 1 : 0);
+    ImGui::Text("statuscode: %d (auth: %d)", statuscode, authenticated ? 1 : 0);
 
   ImGui::End();
-  return result == 1;
+  return statuscode == 200 && authenticated;
 }
 
 void PortfolioUI()
 {
-  static std::vector<PositionData> positions;
-  static SummaryData summary;
-  static bool posDone = false;
-  static bool sumDone = false;
+  static PositionsResult posResult;
+  static int posCoroHandle = -1;
   static float posRefreshTimer = -1.0f;
+  static int ledgerCoroHandle = -1;
+  static LedgerResult ledgerResult;
+  static int summaryCoroHandle = -1;
+  static SummaryResult summaryResult;
+  
+  static float ledgerRefreshTimer = -1.0f;
+  static float summaryRefreshTimer = -1.0f;
+  static bool summaryAndLedgerDoneOnce = false;
 
   if (posRefreshTimer < 0.f)
   {
-    int r = PollPositions(gAccountId, positions);
-    if (r == 1)
+    if (posCoroHandle == -1)
     {
-      posDone = true;
-      posRefreshTimer = 0.0f;
+      posResult.accountId = gAccountId;
+      posCoroHandle = create_managed_coroutine(PollPositions, &posResult);
+    }
+    else
+    {
+      mco_coro* co = get_coroutine(posCoroHandle);
+      if (!co || mco_status(co) == MCO_DEAD)
+      {
+        destroy_coroutine(posCoroHandle);
+        posCoroHandle = -1;
+        posRefreshTimer = 0.0f;
+      }
     }
   }
   else
   {
     posRefreshTimer += ImGui::GetIO().DeltaTime;
-    PollPositions(gAccountId, positions);
-
     if (posRefreshTimer >= 5.0f)
     {
-      PollPositions(gAccountId, positions, true);
+      posResult.accountId = gAccountId;
+      posCoroHandle = create_managed_coroutine(PollPositions, &posResult);
       posRefreshTimer = 0.0f;
     }
   }
 
-  if (!sumDone)
+  if (ledgerRefreshTimer < 0.f)
   {
-    int r = PollLedger(gAccountId, summary);
-    if (r == 1)
-      sumDone = true;
+    if (ledgerCoroHandle == -1)
+    {
+      ledgerResult.accountId = gAccountId;
+      ledgerCoroHandle = create_managed_coroutine(PollLedger, &ledgerResult);
+    }
+    else
+    {
+      mco_coro* co = get_coroutine(ledgerCoroHandle);
+      if (!co || mco_status(co) == MCO_DEAD)
+      {
+        destroy_coroutine(ledgerCoroHandle);
+        ledgerCoroHandle = -1;
+        ledgerRefreshTimer = 0.0f;
+      }
+    }
   }
-  PollSummary(gAccountId, summary);
+  else
+  {
+    ledgerRefreshTimer += ImGui::GetIO().DeltaTime;
+    if (ledgerRefreshTimer >= 5.0f)
+    {
+      ledgerResult.accountId = gAccountId;
+      ledgerCoroHandle = create_managed_coroutine(PollLedger, &ledgerResult);
+      ledgerRefreshTimer = 0.0f;
+    }
+  }
+
+  if (summaryRefreshTimer < 0.f)
+  {
+    if (summaryCoroHandle == -1)
+    {
+      summaryResult.accountId = gAccountId;
+      summaryCoroHandle = create_managed_coroutine(PollSummary, &summaryResult);
+    }
+    else
+    {
+      mco_coro* co = get_coroutine(summaryCoroHandle);
+      if (!co || mco_status(co) == MCO_DEAD)
+      {
+        destroy_coroutine(summaryCoroHandle);
+        summaryCoroHandle = -1;
+        summaryRefreshTimer = 0.0f;
+      }
+    }
+  }
+  else
+  {
+    summaryRefreshTimer += ImGui::GetIO().DeltaTime;
+    if (summaryRefreshTimer >= 5.0f)
+    {
+      summaryResult.accountId = gAccountId;
+      summaryCoroHandle = create_managed_coroutine(PollSummary, &summaryResult);
+      summaryRefreshTimer = 0.0f;
+    }
+  }
+
+  bool ledgerReady = (ledgerCoroHandle == -1 && ledgerResult.success);
+  bool summaryReady = summaryCoroHandle == -1 && summaryResult.success;
+
+  if (!summaryAndLedgerDoneOnce)
+    summaryAndLedgerDoneOnce = ledgerReady && summaryReady;
 
   ImGui::SetNextWindowSize(ImVec2(800, 400), ImGuiCond_FirstUseEver);
   ImGui::SetNextWindowPos(ImVec2(0, 400), ImGuiCond_FirstUseEver);
   ImGui::Begin(gAccountId.c_str());
 
-  if (sumDone)
+  if (summaryAndLedgerDoneOnce)
   {
-    ImGui::Text("Cash Balance Total SGD: %g  USD: %g  NetLiq(SGD): %g", summary.cashSGD,
-                summary.cashUSD, summary.netLiquidationValSGD);
-    ImGui::Text("Buying Power SGD: %g", summary.buyingPowerSGD);
+    ImGui::Text("Cash Balance Total SGD: %g  USD: %g  NetLiq(SGD): %g", ledgerResult.summary.cashSGD,
+                ledgerResult.summary.cashUSD, ledgerResult.summary.netLiquidationValSGD);
+    ImGui::Text("Buying Power SGD: %g", summaryResult.summary.buyingPowerSGD);
   }
   else
   {
     ImGui::Text("Cash Balance Total SGD: ...   USD: ...   SGD: ...");
     ImGui::Text("Buying Power SGD: ...");
   }
-  ImGui::Text("Positions: %d", (int)positions.size());
+  ImGui::Text("Positions: %d", (int)posResult.positions.size());
 
   static bool traded_this_session = false;
   ImGui::Checkbox("Traded This Session Only", &traded_this_session);
@@ -117,9 +203,9 @@ void PortfolioUI()
 
     ImGui::TableHeadersRow();
 
-    for (int i = 0; i < (int)positions.size(); ++i)
+    for (int i = 0; i < (int)posResult.positions.size(); ++i)
     {
-      auto& p = positions[i];
+      auto& p = posResult.positions[i];
 
       ImGui::TableNextRow();
 
@@ -181,7 +267,7 @@ void PortfolioUI()
     ImGui::EndTable();
   }
 
-  if (positions.empty() && !posDone)
+  if (posResult.positions.empty() && posCoroHandle != -1)
   {
     ImGui::TextColored(ImVec4(1, 1, 0, 1), "Loading positions...");
   }
@@ -458,14 +544,28 @@ void MainState()
   }
 
   static bool accountsDone = false;
+  static int accountCoroHandle = -1;
+  static AccountIdResult accountIdResult;
   if (!accountsDone)
   {
-    std::string id;
-    int r = PollAccountId(id);
-    if (r == 1)
+    if (accountCoroHandle == -1)
     {
-      gAccountId = id;
-      accountsDone = true;
+      accountIdResult = AccountIdResult();
+      accountCoroHandle = create_managed_coroutine(PollAccountId, &accountIdResult);
+    }
+    else
+    {
+      mco_coro* co = get_coroutine(accountCoroHandle);
+      if (!co || mco_status(co) == MCO_DEAD)
+      {
+        if (accountIdResult.success)
+        {
+          gAccountId = accountIdResult.accountId;
+          accountsDone = true;
+        }
+        destroy_coroutine(accountCoroHandle);
+        accountCoroHandle = -1;
+      }
     }
   }
 
@@ -480,8 +580,9 @@ void MainState()
     ImGui::SetNextWindowPos(ImVec2(800, 0), ImGuiCond_FirstUseEver);
     ImGui::Begin("Contract Search");
 
+    static ConIdResult conIdResult;
+    static int conidCoroHandle = -1;
     static std::string ticker_result = "";
-    static std::vector<ExchContractId> conids;
     static std::string full_stockname;
     static char symbol[64] = {0};
     bool changed =
@@ -491,12 +592,23 @@ void MainState()
     if (changed)
     {
       ticker_result = symbol;
-      PollConId(symbol, conids, true);
+      conIdResult = ConIdResult();
+      conIdResult.symbol = symbol;
+      if (conidCoroHandle != -1)
+      {
+        destroy_coroutine(conidCoroHandle);
+        conidCoroHandle = -1;
+      }
+      conidCoroHandle = create_managed_coroutine(PollConId, &conIdResult);
     }
-    else
+    else if (conidCoroHandle != -1)
     {
-      static long long conid = -1;
-      int ret = PollConId(symbol, conids);
+      mco_coro* co = get_coroutine(conidCoroHandle);
+      if (!co || mco_status(co) == MCO_DEAD)
+      {
+        destroy_coroutine(conidCoroHandle);
+        conidCoroHandle = -1;
+      }
     }
 
     ImGui::Separator();
@@ -513,9 +625,9 @@ void MainState()
 
       ImGui::TableHeadersRow();
 
-      for (int i = 0; i < (int)conids.size(); ++i)
+      for (int i = 0; i < (int)conIdResult.contracts.size(); ++i)
       {
-        auto& c = conids[i];
+        auto& c = conIdResult.contracts[i];
 
         ImGui::TableNextRow();
 
@@ -564,38 +676,55 @@ void MainState()
 
     if (ImGui::BeginTabBar("ChartTabs"))
     {
+      static std::unordered_map<int, MarketDataResult> s_chartResults;
+      static std::unordered_map<int, int> s_chartCoroHandles;
+
       for (int n = 0; n < (int)chartheaders.size(); n++)
       {
         bool open = true;
         if (ImGui::BeginTabItem(chartheaders[n].mTicker.c_str(), &open))
         {
-          // ImGui::Text("ConId: %d", chartheaders[n].mConnId);
           ImGui::Text("Exchange: %s", chartheaders[n].mExchange.c_str());
 
           int conid = chartheaders[n].mConnId;
 
-          static std::unordered_map<int, std::vector<MarketDataPoint>> s_chartData;
-          static std::unordered_map<int, bool> s_chartReady;
+          MarketDataResult& mdResult = s_chartResults[conid];
+          int& mdCoroHandle = s_chartCoroHandles[conid];
 
-          std::vector<MarketDataPoint>& pts = s_chartData[conid];
-          bool& ready = s_chartReady[conid];
-
-          if (!ready)
+          if (mdCoroHandle == 0)
           {
-            int r = PollMarketDataHistory(conid, pts);
-            if (r == 1)
-              ready = true;
+            mdResult = MarketDataResult();
+            mdResult.conid = conid;
+            mdCoroHandle = create_managed_coroutine(PollMarketDataHistory, &mdResult);
+          }
+          else if (mdCoroHandle != -1)
+          {
+            mco_coro* co = get_coroutine(mdCoroHandle);
+            if (!co || mco_status(co) == MCO_DEAD)
+            {
+              destroy_coroutine(mdCoroHandle);
+              mdCoroHandle = -1;
+            }
           }
 
-          if (ready && !pts.empty())
+          if (mdCoroHandle == -1 && !mdResult.data.empty())
           {
-            PlotStockChart(pts);
+            PlotStockChart(mdResult.data);
           }
 
           ImGui::EndTabItem();
         }
         if (!open)
         {
+          int closedConid = chartheaders[n].mConnId;
+          auto it = s_chartCoroHandles.find(closedConid);
+          if (it != s_chartCoroHandles.end())
+          {
+            if (it->second > 0)
+              destroy_coroutine(it->second);
+            s_chartCoroHandles.erase(it);
+            s_chartResults.erase(closedConid);
+          }
           chartheaders.erase(chartheaders.begin() + n);
           n--;
         }
