@@ -17,6 +17,8 @@
 #define MINICORO_IMPL
 #include "coroutine/minicoro.h"
 
+#include "implot/implot.h"
+
 // Trading Data
 int gConnectionState = 0; // 
 
@@ -62,6 +64,8 @@ int main(int, char**)
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
+    ImPlot::CreateContext();
+
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
@@ -151,7 +155,7 @@ int main(int, char**)
         {
           MainState();
         }
-        
+        //ImPlot::ShowDemoWindow();
 
         // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
         if (show_demo_window)
@@ -173,6 +177,7 @@ int main(int, char**)
     // Cleanup
     ImGui_ImplDX11_Shutdown();
     ImGui_ImplWin32_Shutdown();
+    ImPlot::DestroyContext();
     ImGui::DestroyContext();
 
     CleanupDeviceD3D();

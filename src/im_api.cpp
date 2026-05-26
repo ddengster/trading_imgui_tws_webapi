@@ -6,6 +6,7 @@
 
 #include "naett/naett.h"
 #include "parson/parson.h"
+#include <unordered_map>
 
 /** @todo: planned coroutine implementation
 
@@ -350,6 +351,86 @@ int PollSummary(const std::string& accountId, SummaryData& out_summary)
   }
 
   return done ? 1 : 0;
+}
+
+int PollMarketDataHistory(int conid, std::vector<MarketDataPoint>& out_data, bool force_reset)
+{
+  struct ReqState
+  {
+    naettReq* req = nullptr;
+    naettRes* res = nullptr;
+    bool done = false;
+  };
+  static std::unordered_map<int, ReqState> states;
+
+  ReqState& s = states[conid];
+
+  if (force_reset)
+  {
+    if (s.req)
+    {
+      naettFree(s.req);
+      naettClose(s.res);
+    }
+    s = ReqState();
+  }
+
+  if (s.done)
+    return 1;
+
+  if (s.req == nullptr)
+  {
+    char url[512];
+    snprintf(url, sizeof(url),
+             "https://localhost:5000/v1/api/iserver/marketdata/"
+             "history?conid=%d&period=6h&bar=5min&outsideRth=true",
+             conid);
+    naettOption* options[] = {naettMethod("GET")};
+    s.req = naettRequestWithOptions(url, sizeof(options) / sizeof(options[0]),
+                                    (const naettOption**)&options);
+    s.res = naettMake(s.req);
+    return 0;
+  }
+
+  if (s.res && naettComplete(s.res))
+  {
+    int status = naettGetStatus(s.res);
+    if (status == 200)
+    {
+      out_data.clear();
+      int sz = 0;
+      const void* body = naettGetBody(s.res, &sz);
+      JSON_Value* val = json_parse_string((const char*)body);
+      JSON_Object* obj = json_value_get_object(val);
+      JSON_Array* arr = json_object_get_array(obj, "data");
+      int count = (int)json_array_get_count(arr);
+      for (int i = 0; i < count; ++i)
+      {
+        JSON_Object* bar = json_array_get_object(arr, i);
+        MarketDataPoint pt;
+        pt.open = json_object_get_number(bar, "o");
+        pt.high = json_object_get_number(bar, "h");
+        pt.low = json_object_get_number(bar, "l");
+        pt.close = json_object_get_number(bar, "c");
+        pt.volume = json_object_get_number(bar, "v");
+        pt.timestamp = json_object_get_number(bar, "t");
+        out_data.push_back(pt);
+      }
+      json_value_free(val);
+      s.done = true;
+    }
+    else
+    {
+      s.done = true;
+    }
+
+    naettFree(s.req);
+    naettClose(s.res);
+    s.req = nullptr;
+    s.res = nullptr;
+  }
+
+  return s.done ? 1 : 0;
 }
 
 int PollConId(const std::string& symbol, std::vector<ExchContractId>& out, bool force_reset)
