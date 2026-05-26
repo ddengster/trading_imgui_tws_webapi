@@ -9,18 +9,38 @@
 #include "parson/parson.h"
 #include <unordered_map>
 
-void PollAuthStatus(mco_coro* co)
+#define BASE_URL "https://localhost:5000/v1/api"
+
+
+struct ReqRes
 {
   naettReq* req = nullptr;
   naettRes* res = nullptr;
 
-  naettOption* options[] = {naettMethod("GET")};
-  req =
-    naettRequestWithOptions("https://localhost:5000/v1/api/iserver/auth/status",
-                            sizeof(options) / sizeof(options[0]), (const naettOption**)&options);
-  res = naettMake(req);
+  bool valid() const { return req && res; }
+  void cleanup()
+  {
+    if (req) naettFree(req);
+    if (res) naettClose(res);
+    req = nullptr;
+    res = nullptr;
+  }
+};
 
-  if (!req || !res)
+static ReqRes make_get(const char* url)
+{
+  ReqRes rr;
+  naettOption* options[] = {naettMethod("GET")};
+  rr.req = naettRequestWithOptions(url, 1, (const naettOption**)&options);
+  rr.res = naettMake(rr.req);
+  return rr;
+}
+
+void PollAuthStatus(mco_coro* co)
+{
+  ReqRes rr = make_get(BASE_URL "/iserver/auth/status");
+
+  if (!rr.valid())
   {
     int ret = -1;
     mco_push(co, &ret, sizeof(ret));
@@ -30,493 +50,366 @@ void PollAuthStatus(mco_coro* co)
   }
 
   yield();
+  yield_until_true([](void* ud) { return naettComplete((naettRes*)ud) != 0; }, rr.res);
 
-  auto isComplete = [](void* userdata)
-  {
-    naettRes* res = static_cast<naettRes*>(userdata);
-    return naettComplete(res) != 0;
-  };
-  yield_until_true(isComplete, res);
+  int out_statuscode = naettGetStatus(rr.res);
 
-  int out_statuscode = naettGetStatus(res);
-  
   int authenticated = 0;
   if (out_statuscode == 200)
   {
     int sz = 0;
-    const void* body = naettGetBody(res, &sz);
+    const void* body = naettGetBody(rr.res, &sz);
     JSON_Value* val = json_parse_string((const char*)body);
     JSON_Object* obj = json_value_get_object(val);
     authenticated = json_object_get_boolean(obj, "authenticated");
-    
     json_value_free(val);
   }
-  
+
   mco_push(co, &out_statuscode, sizeof(out_statuscode));
   mco_push(co, &authenticated, sizeof(authenticated));
 
-  naettFree(req);
-  naettClose(res);
-  req = nullptr;
-  res = nullptr;
+  rr.cleanup();
 }
 
-int PollAuthStatus(int& out_statuscode, bool& auth)
+void PollAccountId(mco_coro* co)
 {
-  static naettReq* req = nullptr;
-  static naettRes* res = nullptr;
+  auto* result = static_cast<AccountIdResult*>(mco_get_user_data(co));
 
-  if (req == nullptr)
+  ReqRes rr = make_get(BASE_URL "/portfolio/accounts");
+
+  if (!rr.valid())
   {
-    naettOption* options[] = {naettMethod("GET")};
-    req =
-      naettRequestWithOptions("https://localhost:5000/v1/api/iserver/auth/status",
-                              sizeof(options) / sizeof(options[0]), (const naettOption**)&options);
-    res = naettMake(req);
-    return 0;
+    result->success = false;
+    return;
   }
 
-  if (res && naettComplete(res))
-  {
-    out_statuscode = naettGetStatus(res);
+  yield();
+  yield_until_true([](void* ud) { return naettComplete((naettRes*)ud) != 0; }, rr.res);
 
-    if (out_statuscode == 200)
+  int status = naettGetStatus(rr.res);
+  if (status == 200)
+  {
+    int sz = 0;
+    const void* body = naettGetBody(rr.res, &sz);
+    JSON_Value* val = json_parse_string((const char*)body);
+    JSON_Array* arr = json_value_get_array(val);
+    int n = json_array_get_count(arr);
+    for (int i = 0; i < n; ++i)
     {
-      int sz = 0;
-      const void* body = naettGetBody(res, &sz);
-      JSON_Value* val = json_parse_string((const char*)body);
-      JSON_Object* obj = json_value_get_object(val);
-      int authenticated = json_object_get_boolean(obj, "authenticated");
-      auth = authenticated ? true : false;
-      json_value_free(val);
-
-      naettFree(req);
-      naettClose(res);
-      req = nullptr;
-      res = nullptr;
-
-      return authenticated ? 1 : 0;
-    }
-
-    naettFree(req);
-    naettClose(res);
-    req = nullptr;
-    res = nullptr;
-    return 0;
-  }
-
-  return 0;
-}
-
-int PollAccountId(std::string& out_accountId)
-{
-  static naettReq* req = nullptr;
-  static naettRes* res = nullptr;
-
-  if (req == nullptr)
-  {
-    naettOption* options[] = {naettMethod("GET")};
-    req =
-      naettRequestWithOptions("https://localhost:5000/v1/api/portfolio/accounts",
-                              sizeof(options) / sizeof(options[0]), (const naettOption**)&options);
-    res = naettMake(req);
-    return 0;
-  }
-
-  if (res && naettComplete(res))
-  {
-    int status = naettGetStatus(res);
-    if (status == 200)
-    {
-      int sz = 0;
-      const void* body = naettGetBody(res, &sz);
-      JSON_Value* val = json_parse_string((const char*)body);
-      JSON_Array* arr = json_value_get_array(val);
-      int n = json_array_get_count(arr);
-      for (int i = 0; i < n; ++i)
+      JSON_Object* obj = json_array_get_object(arr, i);
+      const char* id = json_object_get_string(obj, "accountId");
+      if (id)
       {
-        JSON_Object* obj = json_array_get_object(arr, i);
-        const char* id = json_object_get_string(obj, "accountId");
-        if (id)
-        {
-          out_accountId = id;
-          break;
-        }
+        result->accountId = id;
+        break;
       }
-      json_value_free(val);
     }
-
-    naettFree(req);
-    naettClose(res);
-    req = nullptr;
-    res = nullptr;
-    return (status == 200 && !out_accountId.empty()) ? 1 : -1;
+    json_value_free(val);
+    result->success = !result->accountId.empty();
+  }
+  else
+  {
+    result->success = false;
   }
 
-  return 0;
+  rr.cleanup();
 }
 
-int PollPositions(const std::string& accountId, std::vector<PositionData>& out_positions,
-                  bool force_reset)
+void PollPositions(mco_coro* co)
 {
-  static naettReq* req = nullptr;
-  static naettRes* res = nullptr;
-  static int page = 0;
-  static bool complete = false;
-  if (force_reset)
-    complete = false;
+  //printf("query positions\n");
+  auto* result = static_cast<PositionsResult*>(mco_get_user_data(co));
 
-  if (complete)
-    return 1;
+  char url[256];
+  snprintf(url, sizeof(url), BASE_URL "/portfolio/%s/positions/0",
+           result->accountId.c_str());
 
-  if (req == nullptr)
+  ReqRes rr = make_get(url);
+
+  if (!rr.valid())
   {
-    //@note: only 1 page, given 30 positions per page
-    char url[256];
-    snprintf(url, sizeof(url), "https://localhost:5000/v1/api/portfolio/%s/positions/%d",
-             accountId.c_str(), page);
-    naettOption* options[] = {naettMethod("GET")};
-    req = naettRequestWithOptions(url, sizeof(options) / sizeof(options[0]),
-                                  (const naettOption**)&options);
-    res = naettMake(req);
-    return 0;
+    result->success = false;
+    return;
   }
 
-  if (res && naettComplete(res))
+  yield();
+  yield_until_true([](void* ud) { return naettComplete((naettRes*)ud) != 0; }, rr.res);
+
+  int status = naettGetStatus(rr.res);
+  if (status == 200)
   {
-    int status = naettGetStatus(res);
-    if (status == 200)
+    int sz = 0;
+    const void* body = naettGetBody(rr.res, &sz);
+    JSON_Value* val = json_parse_string((const char*)body);
+    JSON_Array* arr = json_value_get_array(val);
+    int n = json_array_get_count(arr);
+    result->positions.clear();
+    result->positions.reserve(n);
+    for (int i = 0; i < n; ++i)
     {
-      out_positions.clear();
-      int sz = 0;
-      const void* body = naettGetBody(res, &sz);
-      JSON_Value* val = json_parse_string((const char*)body);
-      JSON_Array* arr = json_value_get_array(val);
-      int n = json_array_get_count(arr);
-      for (int i = 0; i < n; ++i)
-      {
-        JSON_Object* obj = json_array_get_object(arr, i);
-        const char* contractDesc = json_object_get_string(obj, "contractDesc");
-        double position = json_object_get_number(obj, "position");
-        double avgCost = json_object_get_number(obj, "avgCost");
-        double mktPrice = json_object_get_number(obj, "mktPrice");
-        double mktValue = json_object_get_number(obj, "mktValue");
-        double realizedPnl = json_object_get_number(obj, "realizedPnl");
-        double unrealizedPnl = json_object_get_number(obj, "unrealizedPnl");
-        const char* assetclass = json_object_get_string(obj, "assetClass");
+      JSON_Object* obj = json_array_get_object(arr, i);
+      const char* contractDesc = json_object_get_string(obj, "contractDesc");
+      double position = json_object_get_number(obj, "position");
+      double avgCost = json_object_get_number(obj, "avgCost");
+      double mktPrice = json_object_get_number(obj, "mktPrice");
+      double mktValue = json_object_get_number(obj, "mktValue");
+      double realizedPnl = json_object_get_number(obj, "realizedPnl");
+      double unrealizedPnl = json_object_get_number(obj, "unrealizedPnl");
+      const char* assetclass = json_object_get_string(obj, "assetClass");
 
-        std::string desc = contractDesc ? contractDesc : "";
-        std::string symbol;
-        size_t firstSpace = desc.find(' ');
-        if (firstSpace != std::string::npos)
-          symbol = desc.substr(0, firstSpace);
-        else
-          symbol = desc;
+      std::string desc = contractDesc ? contractDesc : "";
+      std::string symbol;
+      size_t firstSpace = desc.find(' ');
+      if (firstSpace != std::string::npos)
+        symbol = desc.substr(0, firstSpace);
+      else
+        symbol = desc;
 
-        PositionData pd;
-        pd.symbol = symbol;
-        pd.secType = contractDesc;
-        pd.assetClass = assetclass;
-        pd.size = position;
-        pd.averageCost = avgCost;
-        pd.marketPrice = mktPrice;
-        pd.marketValue = mktValue;
-        pd.realizedPNL = realizedPnl;
-        pd.unrealizedPNL = unrealizedPnl;
-        out_positions.push_back(pd);
-      }
-      json_value_free(val);
-      complete = true;
+      PositionData pd;
+      pd.symbol = symbol;
+      pd.secType = contractDesc;
+      pd.assetClass = assetclass;
+      pd.size = position;
+      pd.averageCost = avgCost;
+      pd.marketPrice = mktPrice;
+      pd.marketValue = mktValue;
+      pd.realizedPNL = realizedPnl;
+      pd.unrealizedPNL = unrealizedPnl;
+      result->positions.push_back(pd);
     }
-    else
-    {
-      complete = false;
-    }
-
-    naettFree(req);
-    naettClose(res);
-    req = nullptr;
-    res = nullptr;
+    json_value_free(val);
+    result->success = true;
+  }
+  else
+  {
+    result->success = false;
   }
 
-  return complete ? 1 : 0;
+  rr.cleanup();
 }
 
-
-int PollLedger(const std::string& accountId, SummaryData& out_summary)
+void PollLedger(mco_coro* co)
 {
-  static naettReq* req = nullptr;
-  static naettRes* res = nullptr;
-  static bool done = false;
+  //printf("query ledger\n");
+  auto* result = static_cast<LedgerResult*>(mco_get_user_data(co));
 
-  if (done)
-    return 1;
+  char url[256];
+  snprintf(url, sizeof(url), BASE_URL "/portfolio/%s/ledger",
+           result->accountId.c_str());
 
-  if (req == nullptr)
+  ReqRes rr = make_get(url);
+
+  if (!rr.valid())
   {
-    char url[256];
-    snprintf(url, sizeof(url), "https://localhost:5000/v1/api/portfolio/%s/ledger",
-             accountId.c_str());
-    naettOption* options[] = {naettMethod("GET")};
-    req = naettRequestWithOptions(url, sizeof(options) / sizeof(options[0]),
-                                  (const naettOption**)&options);
-    res = naettMake(req);
-    return 0;
+    result->success = false;
+    return;
   }
 
-  if (res && naettComplete(res))
+  yield();
+  yield_until_true([](void* ud) { return naettComplete((naettRes*)ud) != 0; }, rr.res);
+
+  int status = naettGetStatus(rr.res);
+  if (status == 200)
   {
-    int status = naettGetStatus(res);
-    if (status == 200)
-    {
-      int sz = 0;
-      const void* body = naettGetBody(res, &sz);
-      JSON_Value* val = json_parse_string((const char*)body);
-      JSON_Object* obj = json_value_get_object(val);
+    int sz = 0;
+    const void* body = naettGetBody(rr.res, &sz);
+    JSON_Value* val = json_parse_string((const char*)body);
+    JSON_Object* obj = json_value_get_object(val);
 
-      JSON_Object* cashObj = json_object_get_object(obj, "USD");
-      if (cashObj)
-        out_summary.cashUSD = json_object_get_number(cashObj, "cashbalance");
+    JSON_Object* cashObj = json_object_get_object(obj, "USD");
+    if (cashObj)
+      result->summary.cashUSD = json_object_get_number(cashObj, "cashbalance");
 
-      cashObj = json_object_get_object(obj, "SGD");
-      if (cashObj)
-        out_summary.cashSGD = json_object_get_number(cashObj, "cashbalance");
+    cashObj = json_object_get_object(obj, "SGD");
+    if (cashObj)
+      result->summary.cashSGD = json_object_get_number(cashObj, "cashbalance");
 
-      cashObj = json_object_get_object(obj, "BASE");
-      if (cashObj)
-        out_summary.netLiquidationValSGD = json_object_get_number(cashObj, "netliquidationvalue");
+    cashObj = json_object_get_object(obj, "BASE");
+    if (cashObj)
+      result->summary.netLiquidationValSGD = json_object_get_number(cashObj, "netliquidationvalue");
 
-      json_value_free(val);
-      done = true;
-    }
-    else
-    {
-      done = true;
-    }
-
-    naettFree(req);
-    naettClose(res);
-    req = nullptr;
-    res = nullptr;
+    json_value_free(val);
+    result->success = true;
+  }
+  else
+  {
+    result->success = false;
   }
 
-  return done ? 1 : 0;
+  rr.cleanup();
 }
 
-
-int PollSummary(const std::string& accountId, SummaryData& out_summary)
+void PollSummary(mco_coro* co)
 {
-  static naettReq* req = nullptr;
-  static naettRes* res = nullptr;
-  static bool done = false;
+  //printf("query summary\n");
+  auto* result = static_cast<SummaryResult*>(mco_get_user_data(co));
 
-  if (done)
-    return 1;
+  char url[256];
+  snprintf(url, sizeof(url), BASE_URL "/portfolio/%s/summary",
+           result->accountId.c_str());
 
-  if (req == nullptr)
+  ReqRes rr = make_get(url);
+
+  if (!rr.valid())
   {
-    char url[256];
-    snprintf(url, sizeof(url), "https://localhost:5000/v1/api/portfolio/%s/summary",
-             accountId.c_str());
-    naettOption* options[] = {naettMethod("GET")};
-    req = naettRequestWithOptions(url, sizeof(options) / sizeof(options[0]),
-                                  (const naettOption**)&options);
-    res = naettMake(req);
-    return 0;
+    result->success = false;
+    return;
   }
 
-  if (res && naettComplete(res))
+  yield();
+  yield_until_true([](void* ud) { return naettComplete((naettRes*)ud) != 0; }, rr.res);
+
+  int status = naettGetStatus(rr.res);
+  if (status == 200)
   {
-    int status = naettGetStatus(res);
-    if (status == 200)
-    {
-      int sz = 0;
-      const void* body = naettGetBody(res, &sz);
-      JSON_Value* val = json_parse_string((const char*)body);
-      JSON_Object* obj = json_value_get_object(val);
+    int sz = 0;
+    const void* body = naettGetBody(rr.res, &sz);
+    JSON_Value* val = json_parse_string((const char*)body);
+    JSON_Object* obj = json_value_get_object(val);
 
-      JSON_Object* cashObj = json_object_get_object(obj, "buyingpower");
-      if (cashObj)
-        out_summary.buyingPowerSGD = json_object_get_number(cashObj, "amount");
+    JSON_Object* cashObj = json_object_get_object(obj, "buyingpower");
+    if (cashObj)
+      result->summary.buyingPowerSGD = json_object_get_number(cashObj, "amount");
 
-      json_value_free(val);
-      done = true;
-    }
-    else
-    {
-      done = true;
-    }
-
-    naettFree(req);
-    naettClose(res);
-    req = nullptr;
-    res = nullptr;
+    json_value_free(val);
+    result->success = true;
+  }
+  else
+  {
+    result->success = false;
   }
 
-  return done ? 1 : 0;
+  rr.cleanup();
 }
 
-int PollMarketDataHistory(int conid, std::vector<MarketDataPoint>& out_data, bool force_reset)
+void PollMarketDataHistory(mco_coro* co)
 {
-  struct ReqState
-  {
-    naettReq* req = nullptr;
-    naettRes* res = nullptr;
-    bool done = false;
-  };
-  static std::unordered_map<int, ReqState> states;
+  auto* result = static_cast<MarketDataResult*>(mco_get_user_data(co));
 
-  ReqState& s = states[conid];
+  char url[512];
+  snprintf(url, sizeof(url),
+           BASE_URL "/iserver/marketdata/"
+           "history?conid=%d&period=2h&bar=5min&outsideRth=true",
+           result->conid);
 
-  if (force_reset)
+  ReqRes rr = make_get(url);
+
+  if (!rr.valid())
   {
-    if (s.req)
+    result->success = false;
+    return;
+  }
+
+  yield();
+  yield_until_true([](void* ud) { return naettComplete((naettRes*)ud) != 0; }, rr.res);
+
+  int status = naettGetStatus(rr.res);
+  if (status == 200)
+  {
+    int sz = 0;
+    const void* body = naettGetBody(rr.res, &sz);
+    JSON_Value* val = json_parse_string((const char*)body);
+    JSON_Object* obj = json_value_get_object(val);
+    JSON_Array* arr = json_object_get_array(obj, "data");
+    int count = (int)json_array_get_count(arr);
+    result->data.clear();
+    result->data.reserve(count);
+    for (int i = 0; i < count; ++i)
     {
-      naettFree(s.req);
-      naettClose(s.res);
+      JSON_Object* bar = json_array_get_object(arr, i);
+      MarketDataPoint pt;
+      pt.open = json_object_get_number(bar, "o");
+      pt.high = json_object_get_number(bar, "h");
+      pt.low = json_object_get_number(bar, "l");
+      pt.close = json_object_get_number(bar, "c");
+      pt.volume = json_object_get_number(bar, "v");
+      pt.timestamp = json_object_get_number(bar, "t");
+      result->data.push_back(pt);
     }
-    s = ReqState();
+    json_value_free(val);
+    result->success = true;
+  }
+  else
+  {
+    result->success = false;
   }
 
-  if (s.done)
-    return 1;
+  rr.cleanup();
+}
 
-  if (s.req == nullptr)
+void PollConId(mco_coro* co)
+{
+  auto* result = static_cast<ConIdResult*>(mco_get_user_data(co));
+
+  char url[512];
+  snprintf(url, sizeof(url), BASE_URL "/trsrv/stocks?symbols=%s",
+           result->symbol.c_str());
+
+  ReqRes rr = make_get(url);
+
+  if (!rr.valid())
   {
-    char url[512];
-    snprintf(url, sizeof(url),
-             "https://localhost:5000/v1/api/iserver/marketdata/"
-             "history?conid=%d&period=2h&bar=5min&outsideRth=true",
-             conid);
-    naettOption* options[] = {naettMethod("GET")};
-    s.req = naettRequestWithOptions(url, sizeof(options) / sizeof(options[0]),
-                                    (const naettOption**)&options);
-    s.res = naettMake(s.req);
-    return 0;
+    result->success = false;
+    return;
   }
 
-  if (s.res && naettComplete(s.res))
+  yield();
+  yield_until_true([](void* ud) { return naettComplete((naettRes*)ud) != 0; }, rr.res);
+
+  int status = naettGetStatus(rr.res);
+  if (status == 200)
   {
-    int status = naettGetStatus(s.res);
-    if (status == 200)
+    const char* skipped_exch[] = {"MEXI"};
+    int skipped_exch_count = sizeof(skipped_exch) / sizeof(skipped_exch[0]);
+
+    int sz = 0;
+    const void* body = naettGetBody(rr.res, &sz);
+    JSON_Value* val = json_parse_string((const char*)body);
+    JSON_Object* obj = json_value_get_object(val);
+    JSON_Array* arr = json_object_get_array(obj, result->symbol.c_str());
+    int count = (int)json_array_get_count(arr);
+    result->contracts.clear();
+    if (arr && count > 0)
     {
-      out_data.clear();
-      int sz = 0;
-      const void* body = naettGetBody(s.res, &sz);
-      JSON_Value* val = json_parse_string((const char*)body);
-      JSON_Object* obj = json_value_get_object(val);
-      JSON_Array* arr = json_object_get_array(obj, "data");
-      int count = (int)json_array_get_count(arr);
       for (int i = 0; i < count; ++i)
       {
-        JSON_Object* bar = json_array_get_object(arr, i);
-        MarketDataPoint pt;
-        pt.open = json_object_get_number(bar, "o");
-        pt.high = json_object_get_number(bar, "h");
-        pt.low = json_object_get_number(bar, "l");
-        pt.close = json_object_get_number(bar, "c");
-        pt.volume = json_object_get_number(bar, "v");
-        pt.timestamp = json_object_get_number(bar, "t");
-        out_data.push_back(pt);
-      }
-      json_value_free(val);
-      s.done = true;
-    }
-    else
-    {
-      s.done = true;
-    }
+        JSON_Object* entry = json_array_get_object(arr, i);
+        std::string full_stockname = json_object_get_string(entry, "name");
 
-    naettFree(s.req);
-    naettClose(s.res);
-    s.req = nullptr;
-    s.res = nullptr;
-  }
-
-  return s.done ? 1 : 0;
-}
-
-int PollConId(const std::string& symbol, std::vector<ExchContractId>& out, bool force_reset)
-{
-  static naettReq* req = nullptr;
-  static naettRes* res = nullptr;
-  static bool done = false;
-
-  if (force_reset)
-    done = false;
-
-  if (done)
-    return 1;
-
-  if (req == nullptr)
-  {
-    char url[512];
-    snprintf(url, sizeof(url), "https://localhost:5000/v1/api/trsrv/stocks?symbols=%s",
-             symbol.c_str());
-    naettOption* options[] = {naettMethod("GET")};
-    req = naettRequestWithOptions(url, sizeof(options) / sizeof(options[0]),
-                                  (const naettOption**)&options);
-    res = naettMake(req);
-    return 0;
-  }
-
-  if (res && naettComplete(res))
-  {
-    int status = naettGetStatus(res);
-    if (status == 200)
-    {
-      out.clear();
-      int sz = 0;
-      const void* body = naettGetBody(res, &sz);
-      JSON_Value* val = json_parse_string((const char*)body);
-      JSON_Object* obj = json_value_get_object(val);
-      JSON_Array* arr = json_object_get_array(obj, symbol.c_str());
-      int count = (int)json_array_get_count(arr);
-      if (arr && count > 0)
-      {
-        const char* allowed_exch[] = {"SMART", "NYSE", "NASDAQ", "BATS"};
-        int allowed_exch_count = sizeof(allowed_exch) / sizeof(allowed_exch[0]);
-
-        for (int i = 0; i < count; ++i)
+        JSON_Array* contracts_arr = json_object_get_array(entry, "contracts");
+        int contracts_count = (int)json_array_get_count(contracts_arr);
+        for (int j = 0; j < contracts_count; ++j)
         {
-          JSON_Object* entry = json_array_get_object(arr, i);
-          std::string full_stockname = json_object_get_string(entry, "name");
+          JSON_Object* contract = json_array_get_object(contracts_arr, j);
+          const char* exch = json_object_get_string(contract, "exchange");
 
-          JSON_Array* contracts_arr = json_object_get_array(entry, "contracts");
-          int contracts_count = (int)json_array_get_count(contracts_arr);
-          for (int j = 0; j < contracts_count; ++j)
+          if (!exch)
+            continue;
+          bool skipped = false;
+          for (int k = 0; k < skipped_exch_count; ++k)
           {
-            JSON_Object* contract = json_array_get_object(contracts_arr, j);
-            const char* exch = json_object_get_string(contract, "exchange");
-
-            if (!exch)
-              continue;
-
-            for (int k = 0; k < allowed_exch_count; ++k)
+            if (strcmp(exch, skipped_exch[k]) == 0)
             {
-              if (strcmp(exch, allowed_exch[k]) == 0)
-              {
-                int out_conid = (int)json_object_get_number(contract, "conid");
-                out.push_back({full_stockname, exch, out_conid});
-                break;
-              }
+              skipped = true;
+              break;
             }
           }
+
+          if (skipped)
+            continue;
+
+          int out_conid = (int)json_object_get_number(contract, "conid");
+          result->contracts.push_back({full_stockname, exch, out_conid});
         }
       }
-      json_value_free(val);
-      done = true;
     }
-    else
-    {
-      done = true;
-    }
-
-    naettFree(req);
-    naettClose(res);
-    req = nullptr;
-    res = nullptr;
+    json_value_free(val);
+    result->success = true;
+  }
+  else
+  {
+    result->success = false;
   }
 
-  return done ? 1 : 0;
+  rr.cleanup();
 }

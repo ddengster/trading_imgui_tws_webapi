@@ -5,13 +5,7 @@
 #include <vector>
 #include "coroutine/coroutine_mgt.h"
 
-void PollAuthStatus(mco_coro* co);
-
-int PollAccountId(std::string& out_accountId);
-int PollPositions(const std::string& accountId, std::vector<PositionData>& out_positions,
-                  bool force_reset = false);
-int PollLedger(const std::string& accountId, SummaryData& out_summary);
-int PollSummary(const std::string& accountId, SummaryData& out_summary);
+// --- Data types ---
 
 struct MarketDataPoint
 {
@@ -22,8 +16,6 @@ struct MarketDataPoint
   double volume;
   double timestamp;
 };
-int PollMarketDataHistory(int conid, std::vector<MarketDataPoint>& out_data,
-                          bool force_reset = false);
 
 struct ExchContractId
 {
@@ -31,5 +23,56 @@ struct ExchContractId
   std::string exchange;
   int conid;
 };
-int PollConId(const std::string& symbol, std::vector<ExchContractId>& out,
-              bool force_reset = false);
+
+// --- Coroutine parameter structs ---
+
+struct AccountIdResult
+{
+  std::string accountId;
+  bool success = false;
+};
+
+struct PositionsResult
+{
+  std::string accountId;
+  std::vector<PositionData> positions;
+  bool success = false;
+};
+
+struct LedgerResult
+{
+  std::string accountId;
+  SummaryData summary;
+  bool success = false;
+};
+
+struct SummaryResult
+{
+  std::string accountId;
+  SummaryData summary;
+  bool success = false;
+};
+
+struct MarketDataResult
+{
+  int conid;
+  std::vector<MarketDataPoint> data;
+  bool success = false;
+};
+
+struct ConIdResult
+{
+  std::string symbol;
+  std::vector<ExchContractId> contracts;
+  bool success = false;
+};
+
+// --- Coroutine functions ---
+
+void PollAuthStatus(mco_coro* co);
+void PollAccountId(mco_coro* co);
+void PollPositions(mco_coro* co);
+void PollLedger(mco_coro* co);
+void PollSummary(mco_coro* co);
+void PollMarketDataHistory(mco_coro* co);
+void PollConId(mco_coro* co);
