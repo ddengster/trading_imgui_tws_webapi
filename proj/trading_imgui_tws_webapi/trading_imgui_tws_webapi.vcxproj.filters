@@ -14,6 +14,12 @@
     <Filter Include="parson">
       <UniqueIdentifier>{8dc7019d-d822-43b8-8b24-792b696bfd0d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="coroutine">
+      <UniqueIdentifier>{206e5b91-395e-4f65-a6c1-396ab867bcb3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="implot">
+      <UniqueIdentifier>{3ca6ecb7-35f7-4140-b635-5f721197cc9c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\..\src\imgui.natvis" />
@@ -49,6 +55,15 @@
       <Filter>parson</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\im_api.cpp" />
+    <ClCompile Include="..\..\src\implot\implot.cpp">
+      <Filter>implot</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\implot\implot_demo.cpp">
+      <Filter>implot</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\implot\implot_items.cpp">
+      <Filter>implot</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\src\imgui.natstepfilter" />
@@ -87,5 +102,14 @@
       <Filter>parson</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\im_api.h" />
+    <ClInclude Include="..\..\src\coroutine\minicoro.h">
+      <Filter>coroutine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\implot\implot.h">
+      <Filter>implot</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\implot\implot_internal.h">
+      <Filter>implot</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
