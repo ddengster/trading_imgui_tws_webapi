@@ -234,6 +234,7 @@ int TimeStampFormatter(double ts_ms, char* buffer, int buffer_size, void*)
 void TickerTooltip(const std::vector<MarketDataPoint>& data, const std::vector<double>& time,
                    bool span_subplots = false)
 {
+  //@todo: mouse coordinate to data index mapping is wrong
   ImDrawList* draw_list = ImPlot::GetPlotDrawList();
 
   ImPlotRect limits = ImPlot::GetPlotLimits();
