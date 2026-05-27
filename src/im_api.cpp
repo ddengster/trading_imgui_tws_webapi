@@ -8,6 +8,7 @@
 #include "naett/naett.h"
 #include "parson/parson.h"
 #include <unordered_map>
+#include <ctime>
 
 #define BASE_URL "https://localhost:5000/v1/api"
 
@@ -328,6 +329,63 @@ void PollMarketDataHistory(mco_coro* co)
     }
     json_value_free(val);
     result->success = true;
+  }
+  else
+  {
+    result->success = false;
+  }
+
+  rr.cleanup();
+}
+
+void PollMarketDataSnapshot(mco_coro* co)
+{
+  //@note: Reference for field arguments:
+  // https://www.interactivebrokers.eu/campus/ibkr-api-page/cpapi-v1/?utm_source=chatgpt.com#market-data-fields
+  auto* result = static_cast<SnapshotResult*>(mco_get_user_data(co));
+  
+  
+  time_t now = time(NULL);
+  now -= 3600;  // go back 1 hour to ensure we get valid data even if the market just opened
+  struct tm* tmt = localtime(&now);
+  time_t epoch = mktime(tmt);
+
+  char url[512];
+  snprintf(url, sizeof(url), BASE_URL "/iserver/marketdata/snapshot?conids=%d&since=%ld&fields=31,84,86",
+           result->conid, epoch);
+
+  ReqRes rr = make_get(url);
+
+  if (!rr.valid())
+  {
+    result->success = false;
+    return;
+  }
+
+  yield();
+  yield_until_true([](void* ud) { return naettComplete((naettRes*)ud) != 0; }, rr.res);
+
+  int status = naettGetStatus(rr.res);
+  if (status == 200)
+  {
+    int sz = 0;
+    const void* body = naettGetBody(rr.res, &sz);
+    JSON_Value* val = json_parse_string((const char*)body);
+
+    JSON_Array* arr = json_value_get_array(val);
+    if (arr && json_array_get_count(arr) > 0)
+    {
+      JSON_Object* obj = json_array_get_object(arr, 0);
+      const char* last_str = json_object_get_string(obj, "31");
+      result->last = last_str ? atof(last_str) : 0.0; 
+      const char* bid_str = json_object_get_string(obj, "84");
+      result->bid = bid_str ? atof(bid_str) : 0.0;
+      const char* ask_str = json_object_get_string(obj, "86");
+      result->ask = ask_str ? atof(ask_str) : 0.0;
+      result->success = true;
+    }
+
+    json_value_free(val);
   }
   else
   {

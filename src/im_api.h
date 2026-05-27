@@ -60,6 +60,29 @@ struct MarketDataResult
   bool success = false;
 };
 
+struct SnapshotResult
+{
+  // args
+  int conid;
+
+
+  // result
+  double last = 0.0;
+  double bid = 0.0;
+  double ask = 0.0;
+  bool success = false;
+};
+
+struct StockChartData
+{
+  MarketDataResult mMarketDataResult;
+  SnapshotResult mSnapshotResult;
+
+  int mMarketDataCoroHandle = -1;
+  int mSnapshotDataCoroHandle = -1;
+  float mTimer = -1.0f;
+};
+
 struct ConIdResult
 {
   std::string symbol;
@@ -81,5 +104,6 @@ void PollPositions(mco_coro* co);
 void PollLedger(mco_coro* co);
 void PollSummary(mco_coro* co);
 void PollMarketDataHistory(mco_coro* co);
+void PollMarketDataSnapshot(mco_coro* co);
 void PollConId(mco_coro* co);
 void PollOrders(mco_coro* co);
