@@ -381,6 +381,141 @@ void TickerTooltip(const std::vector<MarketDataPoint>& data, const std::vector<d
   }
 }
 
+static int IBKRTimeStrToLocalTime(const char* ts, char* buf, int buf_sz)
+{
+  struct tm tm_utc = {0};
+
+  tm_utc.tm_year = 2000 + (ts[0] - '0') * 10 + (ts[1] - '0') - 1900;
+  tm_utc.tm_mon = ((ts[2] - '0') * 10 + (ts[3] - '0')) - 1;
+  tm_utc.tm_mday = (ts[4] - '0') * 10 + (ts[5] - '0');
+  tm_utc.tm_hour = (ts[6] - '0') * 10 + (ts[7] - '0');
+  tm_utc.tm_min = (ts[8] - '0') * 10 + (ts[9] - '0');
+  tm_utc.tm_sec = (ts[10] - '0') * 10 + (ts[11] - '0');
+
+  tm_utc.tm_isdst = -1;  // let system determine DST
+
+  time_t t;
+
+#ifdef _WIN32
+  t = _mkgmtime(&tm_utc);  // Windows
+#else
+  t = timegm(&tm_utc);  // POSIX (Linux/macOS)
+#endif
+  struct tm* tm_local = localtime(&t);
+  strftime(buf, buf_sz, "%Y-%m-%d %H:%M:%S", tm_local);
+  return 0;
+}
+
+void OrderWindowUI()
+{
+  static OrdersResult ordersResult;
+  static int ordersCoroHandle = -1;
+  static float ordersRefreshTimer = -1.0f;
+
+  if (ordersRefreshTimer < 0.f)
+  {
+    if (ordersCoroHandle == -1)
+    {
+      ordersResult = OrdersResult();
+      ordersCoroHandle = create_managed_coroutine(PollOrders, &ordersResult);
+    }
+    else
+    {
+      mco_coro* co = get_coroutine(ordersCoroHandle);
+      if (!co || mco_status(co) == MCO_DEAD)
+      {
+        destroy_coroutine(ordersCoroHandle);
+        ordersCoroHandle = -1;
+        ordersRefreshTimer = 0.0f;
+      }
+    }
+  }
+  else
+  {
+    ordersRefreshTimer += ImGui::GetIO().DeltaTime;
+    if (ordersRefreshTimer >= 5.0f)
+    {
+      ordersCoroHandle = create_managed_coroutine(PollOrders, &ordersResult);
+      ordersRefreshTimer = 0.0f;
+    }
+  }
+
+  ImGui::SetNextWindowSize(ImVec2(600, 300), ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowPos(ImVec2(800, 400), ImGuiCond_FirstUseEver);
+  if (ImGui::Begin("Orders"))
+  {
+    static bool show_open_orders_only = true;
+    ImGui::Checkbox("Open Orders Only", &show_open_orders_only);
+
+    if (ImGui::BeginTable("orders", 8, ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable))
+    {
+      ImGui::TableSetupColumn("LastExecTime");
+      ImGui::TableSetupColumn("Symbol");
+      ImGui::TableSetupColumn("Side");
+      ImGui::TableSetupColumn("Type");
+      ImGui::TableSetupColumn("Filled");
+      ImGui::TableSetupColumn("Limit Price");
+      ImGui::TableSetupColumn("Stop Price");
+      ImGui::TableSetupColumn("Status");
+
+      ImGui::TableHeadersRow();
+
+      for (int i = 0; i < (int)ordersResult.orders.size(); ++i)
+      {
+        auto& o = ordersResult.orders[i];
+
+        if (show_open_orders_only && o.status == "Filled")
+          continue;
+
+        ImGui::TableNextRow();
+
+        ImGui::TableNextColumn();
+        {
+          char buf[32] = {};
+          IBKRTimeStrToLocalTime(o.lastExecutionTime.c_str(), buf, sizeof(buf));
+          ImGui::TextWrapped("%s", buf);
+        }
+        
+        ImGui::TableNextColumn();
+        ImGui::Text(o.symbol.c_str());
+        ImGui::TableNextColumn();
+        ImGui::Text(o.side.c_str());
+        ImGui::TableNextColumn();
+        ImGui::Text(o.orderType.c_str());
+        ImGui::TableNextColumn();
+
+        char t[64] = {0};
+        snprintf(t, sizeof(t), "%g/%g", o.filledQuantity, o.totalSize);
+        ImGui::Text(t);
+        ImGui::TableNextColumn();
+
+        snprintf(t, sizeof(t), "%.2f", o.limitPrice);
+        ImGui::Text(t);
+        ImGui::TableNextColumn();
+
+        snprintf(t, sizeof(t), "%.2f", o.stopPrice);
+        ImGui::Text(t);
+        ImGui::TableNextColumn();
+
+        ImGui::Text(o.status.c_str());
+      }
+
+      ImGui::EndTable();
+    }
+
+    if (ordersResult.orders.empty() && ordersCoroHandle != -1)
+    {
+      ImGui::TextColored(ImVec4(1, 1, 0, 1), "Loading orders...");
+    }
+    else if (ordersResult.orders.empty() && ordersCoroHandle == -1)
+    {
+      ImGui::TextColored(ImVec4(1, 1, 0, 1), "No orders");
+    }
+
+    ImGui::End();
+  }
+}
+
 void PlotStockChart(const std::vector<MarketDataPoint>& data)
 {
   if (data.empty())
@@ -734,4 +869,7 @@ void MainState()
 
     ImGui::End();
   }
+
+  // order window
+  OrderWindowUI();
 }

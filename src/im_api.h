@@ -67,6 +67,12 @@ struct ConIdResult
   bool success = false;
 };
 
+struct OrdersResult
+{
+  std::vector<OrderData> orders;
+  bool success = false;
+};
+
 // --- Coroutine functions ---
 
 void PollAuthStatus(mco_coro* co);
@@ -76,3 +82,4 @@ void PollLedger(mco_coro* co);
 void PollSummary(mco_coro* co);
 void PollMarketDataHistory(mco_coro* co);
 void PollConId(mco_coro* co);
+void PollOrders(mco_coro* co);

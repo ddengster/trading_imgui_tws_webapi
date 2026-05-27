@@ -413,3 +413,63 @@ void PollConId(mco_coro* co)
 
   rr.cleanup();
 }
+
+void PollOrders(mco_coro* co)
+{
+  auto* result = static_cast<OrdersResult*>(mco_get_user_data(co));
+
+  ReqRes rr = make_get(BASE_URL "/iserver/account/orders");
+
+  if (!rr.valid())
+  {
+    result->success = false;
+    return;
+  }
+
+  yield();
+  yield_until_true([](void* ud) { return naettComplete((naettRes*)ud) != 0; }, rr.res);
+
+  int status = naettGetStatus(rr.res);
+  if (status == 200)
+  {
+    int sz = 0;
+    const void* body = naettGetBody(rr.res, &sz);
+    JSON_Value* val = json_parse_string((const char*)body);
+    JSON_Object* root = json_value_get_object(val);
+    JSON_Array* arr = json_object_get_array(root, "orders");
+    int n = json_array_get_count(arr);
+    result->orders.clear();
+    result->orders.reserve(n);
+    for (int i = 0; i < n; ++i)
+    {
+      JSON_Object* obj = json_array_get_object(arr, i);
+      OrderData od;
+      od.orderId = (int)json_object_get_number(obj, "orderId");
+      const char* symbol = json_object_get_string(obj, "ticker");
+      od.symbol = symbol ? symbol : "";
+      const char* side = json_object_get_string(obj, "side");
+      od.side = side ? side : "";
+      const char* orderType = json_object_get_string(obj, "orderType");
+      od.orderType = orderType ? orderType : "";
+      od.totalSize = json_object_get_number(obj, "totalSize");
+      od.filledQuantity = json_object_get_number(obj, "filledQuantity");
+      od.remainingQuantity = json_object_get_number(obj, "remainingQuantity");
+      const char* pricestr = json_object_get_string(obj, "price");
+      od.limitPrice = pricestr ? atof(pricestr) : 0.0;
+      const char* stopprice_str = json_object_get_string(obj, "stop_price");
+      od.stopPrice = stopprice_str ? atof(stopprice_str) : 0.0; 
+      const char* statusStr = json_object_get_string(obj, "status");
+      od.status = statusStr ? statusStr : "";
+      od.lastExecutionTime = json_object_get_string(obj, "lastExecutionTime");
+      result->orders.push_back(od);
+    }
+    json_value_free(val);
+    result->success = true;
+  }
+  else
+  {
+    result->success = false;
+  }
+
+  rr.cleanup();
+}
