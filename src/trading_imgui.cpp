@@ -516,8 +516,8 @@ void OrderWindowUI()
       ImGui::TextColored(ImVec4(1, 1, 0, 1), "No orders");
     }
 
-    ImGui::End();
   }
+  ImGui::End();
 }
 
 void FreshOrderWindowUI()
@@ -574,7 +574,7 @@ void FreshOrderWindowUI()
 
     ImGui::NewLine();
 
-    if (ImGui::Button("Submit"))
+    if (ImGui::Button("Submit", ImVec2(-1.f, 20.f)))
     {
       postOrderData.conid = gFreshOrderConid;
       postOrderData.orderType = current_order_type;
@@ -595,8 +595,8 @@ void FreshOrderWindowUI()
                          postOrderData.order_status.c_str());
     }
 
-    ImGui::End();
   }
+  ImGui::End();
 
   if (postOrderCoroHandle != -1)
   {
