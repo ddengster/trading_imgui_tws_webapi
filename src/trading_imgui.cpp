@@ -13,6 +13,7 @@
 #include <time.h>
 #include <ctime>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "coroutine/coroutine_mgt.h"
 
@@ -70,7 +71,7 @@ void PortfolioUI()
   static LedgerResult ledgerResult;
   static int summaryCoroHandle = -1;
   static SummaryResult summaryResult;
-  
+
   static float ledgerRefreshTimer = -1.0f;
   static float summaryRefreshTimer = -1.0f;
   static bool summaryAndLedgerDoneOnce = false;
@@ -174,8 +175,9 @@ void PortfolioUI()
 
   if (summaryAndLedgerDoneOnce)
   {
-    ImGui::Text("Cash Balance Total SGD: %g  USD: %g  NetLiq(SGD): %g", ledgerResult.summary.cashSGD,
-                ledgerResult.summary.cashUSD, ledgerResult.summary.netLiquidationValSGD);
+    ImGui::Text("Cash Balance Total SGD: %g  USD: %g  NetLiq(SGD): %g",
+                ledgerResult.summary.cashSGD, ledgerResult.summary.cashUSD,
+                ledgerResult.summary.netLiquidationValSGD);
     ImGui::Text("Buying Power SGD: %g", summaryResult.summary.buyingPowerSGD);
   }
   else
@@ -378,6 +380,141 @@ void TickerTooltip(const std::vector<MarketDataPoint>& data, const std::vector<d
       ImGui::Text(buf);
       ImGui::EndTooltip();
     }
+  }
+}
+
+static int IBKRTimeStrToLocalTime(const char* ts, char* buf, int buf_sz)
+{
+  struct tm tm_utc = {0};
+
+  tm_utc.tm_year = 2000 + (ts[0] - '0') * 10 + (ts[1] - '0') - 1900;
+  tm_utc.tm_mon = ((ts[2] - '0') * 10 + (ts[3] - '0')) - 1;
+  tm_utc.tm_mday = (ts[4] - '0') * 10 + (ts[5] - '0');
+  tm_utc.tm_hour = (ts[6] - '0') * 10 + (ts[7] - '0');
+  tm_utc.tm_min = (ts[8] - '0') * 10 + (ts[9] - '0');
+  tm_utc.tm_sec = (ts[10] - '0') * 10 + (ts[11] - '0');
+
+  tm_utc.tm_isdst = -1;  // let system determine DST
+
+  time_t t;
+
+#ifdef _WIN32
+  t = _mkgmtime(&tm_utc);  // Windows
+#else
+  t = timegm(&tm_utc);  // POSIX (Linux/macOS)
+#endif
+  struct tm* tm_local = localtime(&t);
+  strftime(buf, buf_sz, "%Y-%m-%d %H:%M:%S", tm_local);
+  return 0;
+}
+
+void OrderWindowUI()
+{
+  static OrdersResult ordersResult;
+  static int ordersCoroHandle = -1;
+  static float ordersRefreshTimer = -1.0f;
+
+  if (ordersRefreshTimer < 0.f)
+  {
+    if (ordersCoroHandle == -1)
+    {
+      ordersResult = OrdersResult();
+      ordersCoroHandle = create_managed_coroutine(PollOrders, &ordersResult);
+    }
+    else
+    {
+      mco_coro* co = get_coroutine(ordersCoroHandle);
+      if (!co || mco_status(co) == MCO_DEAD)
+      {
+        destroy_coroutine(ordersCoroHandle);
+        ordersCoroHandle = -1;
+        ordersRefreshTimer = 0.0f;
+      }
+    }
+  }
+  else
+  {
+    ordersRefreshTimer += ImGui::GetIO().DeltaTime;
+    if (ordersRefreshTimer >= 5.0f)
+    {
+      ordersCoroHandle = create_managed_coroutine(PollOrders, &ordersResult);
+      ordersRefreshTimer = 0.0f;
+    }
+  }
+
+  ImGui::SetNextWindowSize(ImVec2(600, 300), ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowPos(ImVec2(800, 400), ImGuiCond_FirstUseEver);
+  if (ImGui::Begin("Orders"))
+  {
+    static bool show_open_orders_only = true;
+    ImGui::Checkbox("Open Orders Only", &show_open_orders_only);
+
+    if (ImGui::BeginTable("orders", 8, ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable))
+    {
+      ImGui::TableSetupColumn("LastExecTime");
+      ImGui::TableSetupColumn("Symbol");
+      ImGui::TableSetupColumn("Side");
+      ImGui::TableSetupColumn("Type");
+      ImGui::TableSetupColumn("Filled");
+      ImGui::TableSetupColumn("Limit Price");
+      ImGui::TableSetupColumn("Stop Price");
+      ImGui::TableSetupColumn("Status");
+
+      ImGui::TableHeadersRow();
+
+      for (int i = 0; i < (int)ordersResult.orders.size(); ++i)
+      {
+        auto& o = ordersResult.orders[i];
+
+        if (show_open_orders_only && o.status == "Filled")
+          continue;
+
+        ImGui::TableNextRow();
+
+        ImGui::TableNextColumn();
+        {
+          char buf[32] = {};
+          IBKRTimeStrToLocalTime(o.lastExecutionTime.c_str(), buf, sizeof(buf));
+          ImGui::TextWrapped("%s", buf);
+        }
+
+        ImGui::TableNextColumn();
+        ImGui::Text(o.symbol.c_str());
+        ImGui::TableNextColumn();
+        ImGui::Text(o.side.c_str());
+        ImGui::TableNextColumn();
+        ImGui::Text(o.orderType.c_str());
+        ImGui::TableNextColumn();
+
+        char t[64] = {0};
+        snprintf(t, sizeof(t), "%g/%g", o.filledQuantity, o.totalSize);
+        ImGui::Text(t);
+        ImGui::TableNextColumn();
+
+        snprintf(t, sizeof(t), "%.2f", o.limitPrice);
+        ImGui::Text(t);
+        ImGui::TableNextColumn();
+
+        snprintf(t, sizeof(t), "%.2f", o.stopPrice);
+        ImGui::Text(t);
+        ImGui::TableNextColumn();
+
+        ImGui::Text(o.status.c_str());
+      }
+
+      ImGui::EndTable();
+    }
+
+    if (ordersResult.orders.empty() && ordersCoroHandle != -1)
+    {
+      ImGui::TextColored(ImVec4(1, 1, 0, 1), "Loading orders...");
+    }
+    else if (ordersResult.orders.empty() && ordersCoroHandle == -1)
+    {
+      ImGui::TextColored(ImVec4(1, 1, 0, 1), "No orders");
+    }
+
+    ImGui::End();
   }
 }
 
@@ -664,9 +801,15 @@ void MainState()
   }
 
   // stock charts
+  static std::unordered_map<int, StockChartData> s_chartData;
+  static std::unordered_set<int> s_active_conid_thisframe;
+  static std::unordered_set<int> s_to_remove_conid_thisframe;
+  
+  s_active_conid_thisframe.clear();
+  s_to_remove_conid_thisframe.clear();
+
   for (int i = 0; i < concurrent_chart_count; ++i)
   {
-
     ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowPos(ImVec2(0, 400 + i * 300), ImGuiCond_FirstUseEver);
 
@@ -676,62 +819,165 @@ void MainState()
 
     if (ImGui::BeginTabBar("ChartTabs"))
     {
-      static std::unordered_map<int, MarketDataResult> s_chartResults;
-      static std::unordered_map<int, int> s_chartCoroHandles;
-
       for (int n = 0; n < (int)chartheaders.size(); n++)
       {
+        int conid = chartheaders[n].mConnId;
+
         bool open = true;
         if (ImGui::BeginTabItem(chartheaders[n].mTicker.c_str(), &open))
         {
           ImGui::Text("Exchange: %s", chartheaders[n].mExchange.c_str());
 
-          int conid = chartheaders[n].mConnId;
-
-          MarketDataResult& mdResult = s_chartResults[conid];
-          int& mdCoroHandle = s_chartCoroHandles[conid];
-
-          if (mdCoroHandle == 0)
+          if (s_chartData.find(conid) == s_chartData.end())
           {
-            mdResult = MarketDataResult();
-            mdResult.conid = conid;
-            mdCoroHandle = create_managed_coroutine(PollMarketDataHistory, &mdResult);
+            ImGui::Text("Bid: --  |  Ask: --");
+            ImGui::Text("Last: --");
+
+            ImGui::TextColored(ImVec4(1, 1, 0, 1), "Loading..");
           }
-          else if (mdCoroHandle != -1)
+          else
           {
-            mco_coro* co = get_coroutine(mdCoroHandle);
-            if (!co || mco_status(co) == MCO_DEAD)
+            StockChartData& chartData = s_chartData[conid];
+
+            if (chartData.mSnapshotResult.success)
             {
-              destroy_coroutine(mdCoroHandle);
-              mdCoroHandle = -1;
+              ImGui::Text("Bid: %.2f  |  Ask: %.2f", chartData.mSnapshotResult.bid,
+                          chartData.mSnapshotResult.ask);
+              ImGui::Text("Last: %.2f", chartData.mSnapshotResult.last);
             }
-          }
+            else
+            {
+              ImGui::Text("Bid: --  |  Ask: --");
+              ImGui::Text("Last: %.2f", chartData.mSnapshotResult.last);
+            }
 
-          if (mdCoroHandle == -1 && !mdResult.data.empty())
-          {
-            PlotStockChart(mdResult.data);
+            PlotStockChart(chartData.mMarketDataResult.data);
           }
-
+          
           ImGui::EndTabItem();
         }
-        if (!open)
-        {
-          int closedConid = chartheaders[n].mConnId;
-          auto it = s_chartCoroHandles.find(closedConid);
-          if (it != s_chartCoroHandles.end())
-          {
-            if (it->second > 0)
-              destroy_coroutine(it->second);
-            s_chartCoroHandles.erase(it);
-            s_chartResults.erase(closedConid);
-          }
-          chartheaders.erase(chartheaders.begin() + n);
-          n--;
-        }
+
+        if (open)
+          s_active_conid_thisframe.insert(conid);
+        else
+          s_to_remove_conid_thisframe.insert(conid);
       }
       ImGui::EndTabBar();
     }
 
     ImGui::End();
   }
+
+  // update conid's chartData, initiating coroutines as needed
+  {
+    for (int conid : s_active_conid_thisframe)
+    {
+      if (s_chartData.find(conid) == s_chartData.end())
+      {
+        StockChartData dat;
+        dat.mMarketDataResult.conid = conid;
+        dat.mSnapshotResult.conid = conid;
+        s_chartData.insert({conid, dat});
+      }
+    }
+    for (int conid : s_to_remove_conid_thisframe)
+    {
+      if (s_chartData.find(conid) != s_chartData.end())
+      {
+        StockChartData& cd = s_chartData[conid];
+        if (cd.mMarketDataCoroHandle != -1)
+        {
+          mco_coro* co = get_coroutine(cd.mMarketDataCoroHandle);
+          if (co)
+          {
+            destroy_coroutine(cd.mMarketDataCoroHandle);
+            cd.mMarketDataCoroHandle = -1;
+          }
+        }
+        if (cd.mSnapshotDataCoroHandle != -1)
+        {
+          mco_coro* co = get_coroutine(cd.mSnapshotDataCoroHandle);
+          if (co)
+          {
+            destroy_coroutine(cd.mSnapshotDataCoroHandle);
+            cd.mSnapshotDataCoroHandle = -1;
+          }
+        }
+        s_chartData.erase(conid);
+        
+        for (int i = 0; i < chartheaders.size(); ++i)
+        {
+          if (chartheaders[i].mConnId == conid)
+          {
+            chartheaders.erase(chartheaders.begin() + i);
+            break;
+          }
+        }
+      }
+    }
+
+    for (auto& itr : s_chartData)
+    {
+      StockChartData& cd = itr.second;
+      static const float s_chartDataInterval = 5.0f;
+
+      if (cd.mTimer < 0.0f || cd.mTimer >= s_chartDataInterval)
+      {
+        cd.mTimer = 0.0f;
+
+        // destroy whatever in progress coroutines if any and reinitiate new calls
+        if (cd.mMarketDataCoroHandle != -1)
+        {
+          mco_coro* co = get_coroutine(cd.mMarketDataCoroHandle);
+          if (co)
+          {
+            destroy_coroutine(cd.mMarketDataCoroHandle);
+            cd.mMarketDataCoroHandle = -1;
+          }
+        }
+        if (cd.mSnapshotDataCoroHandle != -1)
+        {
+          mco_coro* co = get_coroutine(cd.mSnapshotDataCoroHandle);
+          if (co)
+          {
+            destroy_coroutine(cd.mSnapshotDataCoroHandle);
+            cd.mSnapshotDataCoroHandle = -1;
+          }
+        }
+
+        cd.mMarketDataCoroHandle =
+          create_managed_coroutine(PollMarketDataHistory, &cd.mMarketDataResult);
+
+        cd.mSnapshotDataCoroHandle =
+          create_managed_coroutine(PollMarketDataSnapshot, &cd.mSnapshotResult);
+      }
+      else
+      {
+        cd.mTimer += ImGui::GetIO().DeltaTime;
+
+        if (cd.mMarketDataCoroHandle != -1)
+        {
+          mco_coro* co = get_coroutine(cd.mMarketDataCoroHandle);
+          if (!co || mco_status(co) == MCO_DEAD)
+          {
+            destroy_coroutine(cd.mMarketDataCoroHandle);
+            cd.mMarketDataCoroHandle = -1;
+          }
+        }
+        if (cd.mSnapshotDataCoroHandle != -1)
+        {
+          mco_coro* co = get_coroutine(cd.mSnapshotDataCoroHandle);
+          if (!co || mco_status(co) == MCO_DEAD)
+          {
+            printf("connid: %d, fin time: %g\n", itr.first, cd.mTimer);
+            destroy_coroutine(cd.mSnapshotDataCoroHandle);
+            cd.mSnapshotDataCoroHandle = -1;
+          }
+        }
+      }
+    }
+  }
+
+  // order window
+  OrderWindowUI();
 }
