@@ -803,8 +803,10 @@ void MainState()
   // stock charts
   static std::unordered_map<int, StockChartData> s_chartData;
   static std::unordered_set<int> s_active_conid_thisframe;
-  static const double s_snapshotInterval = 5.0;
+  static std::unordered_set<int> s_to_remove_conid_thisframe;
+  
   s_active_conid_thisframe.clear();
+  s_to_remove_conid_thisframe.clear();
 
   for (int i = 0; i < concurrent_chart_count; ++i)
   {
@@ -857,6 +859,8 @@ void MainState()
 
         if (open)
           s_active_conid_thisframe.insert(conid);
+        else
+          s_to_remove_conid_thisframe.insert(conid);
       }
       ImGui::EndTabBar();
     }
@@ -876,12 +880,48 @@ void MainState()
         s_chartData.insert({conid, dat});
       }
     }
+    for (int conid : s_to_remove_conid_thisframe)
+    {
+      if (s_chartData.find(conid) != s_chartData.end())
+      {
+        StockChartData& cd = s_chartData[conid];
+        if (cd.mMarketDataCoroHandle != -1)
+        {
+          mco_coro* co = get_coroutine(cd.mMarketDataCoroHandle);
+          if (co)
+          {
+            destroy_coroutine(cd.mMarketDataCoroHandle);
+            cd.mMarketDataCoroHandle = -1;
+          }
+        }
+        if (cd.mSnapshotDataCoroHandle != -1)
+        {
+          mco_coro* co = get_coroutine(cd.mSnapshotDataCoroHandle);
+          if (co)
+          {
+            destroy_coroutine(cd.mSnapshotDataCoroHandle);
+            cd.mSnapshotDataCoroHandle = -1;
+          }
+        }
+        s_chartData.erase(conid);
+        
+        for (int i = 0; i < chartheaders.size(); ++i)
+        {
+          if (chartheaders[i].mConnId == conid)
+          {
+            chartheaders.erase(chartheaders.begin() + i);
+            break;
+          }
+        }
+      }
+    }
 
     for (auto& itr : s_chartData)
     {
       StockChartData& cd = itr.second;
+      static const float s_chartDataInterval = 5.0f;
 
-      if (cd.mTimer < 0.0f || cd.mTimer >= 5.0f)
+      if (cd.mTimer < 0.0f || cd.mTimer >= s_chartDataInterval)
       {
         cd.mTimer = 0.0f;
 
@@ -929,6 +969,7 @@ void MainState()
           mco_coro* co = get_coroutine(cd.mSnapshotDataCoroHandle);
           if (!co || mco_status(co) == MCO_DEAD)
           {
+            printf("connid: %d, fin time: %g\n", itr.first, cd.mTimer);
             destroy_coroutine(cd.mSnapshotDataCoroHandle);
             cd.mSnapshotDataCoroHandle = -1;
           }
