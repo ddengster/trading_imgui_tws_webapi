@@ -17,7 +17,11 @@
 
 #include "coroutine/coroutine_mgt.h"
 
-static std::string gAccountId;
+std::string gAccountId;
+std::string gFreshOrderTicker;
+int gFreshOrderConid = -1;
+
+std::unordered_map<int, CancelOrderData> gPendingCancels;
 
 bool ConnectingState()
 {
@@ -449,7 +453,7 @@ void OrderWindowUI()
     static bool show_open_orders_only = true;
     ImGui::Checkbox("Open Orders Only", &show_open_orders_only);
 
-    if (ImGui::BeginTable("orders", 8, ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable))
+    if (ImGui::BeginTable("orders", 9, ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable))
     {
       ImGui::TableSetupColumn("LastExecTime");
       ImGui::TableSetupColumn("Symbol");
@@ -459,14 +463,20 @@ void OrderWindowUI()
       ImGui::TableSetupColumn("Limit Price");
       ImGui::TableSetupColumn("Stop Price");
       ImGui::TableSetupColumn("Status");
+      ImGui::TableSetupColumn("Actions");
 
       ImGui::TableHeadersRow();
+
+      auto non_open_order = [](const std::string& status) -> bool
+      {
+        return status == "Filled" || status == "Cancelled" || status == "Inactive";
+      };
 
       for (int i = 0; i < (int)ordersResult.orders.size(); ++i)
       {
         auto& o = ordersResult.orders[i];
 
-        if (show_open_orders_only && o.status == "Filled")
+        if (show_open_orders_only && non_open_order(o.status))
           continue;
 
         ImGui::TableNextRow();
@@ -497,9 +507,28 @@ void OrderWindowUI()
 
         snprintf(t, sizeof(t), "%.2f", o.stopPrice);
         ImGui::Text(t);
-        ImGui::TableNextColumn();
 
+        ImGui::TableNextColumn();
         ImGui::Text(o.status.c_str());
+
+        ImGui::TableNextColumn();
+        if (!non_open_order(o.status))
+        {
+          auto it = gPendingCancels.find(o.orderId);
+          bool cancelling = it != gPendingCancels.end();
+          if (!cancelling && ImGui::Button("Cancel"))
+          {
+            CancelOrderData pc;
+            pc.orderId = o.orderId;
+            pc.coroHandle = create_managed_coroutine(CancelOrder, (void*)o.orderId);
+            gPendingCancels[o.orderId] = pc;
+          }
+          if (cancelling)
+          {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(1, 1, 0, 1), "cancelling...");
+          }
+        }
       }
 
       ImGui::EndTable();
@@ -513,8 +542,170 @@ void OrderWindowUI()
     {
       ImGui::TextColored(ImVec4(1, 1, 0, 1), "No orders");
     }
+  }
+  ImGui::End();
 
-    ImGui::End();
+  for (auto it = gPendingCancels.begin(); it != gPendingCancels.end();)
+  {
+    auto& pc = it->second;
+    mco_coro* co = get_coroutine(pc.coroHandle);
+    if (!co || mco_status(co) == MCO_DEAD)
+    {
+      destroy_coroutine(pc.coroHandle);
+      if (pc.success)
+        printf("Order %d cancelled successfully\n", pc.orderId);
+      else
+        printf("Failed to cancel order %d\n", pc.orderId);
+      it = gPendingCancels.erase(it);
+    }
+    else
+    {
+      ++it;
+    }
+  }
+}
+
+void FreshOrderWindowUI()
+{
+  if (gFreshOrderConid == -1)
+    return;
+
+  char n[32] = {};
+  snprintf(n, sizeof(n), "Fresh Order - %s(%d)", gFreshOrderTicker.c_str(), gFreshOrderConid);
+
+  static PostOrderData postOrderData;
+  static int quantity = 1;
+  static int postOrderCoroHandle = -1;
+
+  ImGui::SetNextWindowSize(ImVec2(600, 300), ImGuiCond_FirstUseEver);
+  ImGui::SetNextWindowPos(ImVec2(800, 400), ImGuiCond_FirstUseEver);
+  if (ImGui::Begin(n))
+  {
+    const char* possible_actions[] = {"BUY", "SELL"};
+    static const char* current_action = possible_actions[0];
+
+    if (ImGui::BeginCombo("Action", current_action))
+    {
+      for (int n = 0; n < IM_ARRAYSIZE(possible_actions); n++)
+      {
+        bool is_selected = (current_action == possible_actions[n]);
+        if (ImGui::Selectable(possible_actions[n], is_selected))
+          current_action = possible_actions[n];
+        if (is_selected)
+          ImGui::SetItemDefaultFocus();
+      }
+      ImGui::EndCombo();
+    }
+
+    static const char* possible_order_types[] = {"LMT"};
+    static const char* current_order_type = possible_order_types[0];
+    if (ImGui::BeginCombo("Order Type", current_order_type))
+    {
+      for (int n = 0; n < IM_ARRAYSIZE(possible_order_types); n++)
+      {
+        bool is_selected = (current_order_type == possible_order_types[n]);
+        if (ImGui::Selectable(possible_order_types[n], is_selected))
+          current_order_type = possible_order_types[n];
+        if (is_selected)
+          ImGui::SetItemDefaultFocus();
+      }
+      ImGui::EndCombo();
+    }
+
+    if (ImGui::BeginTabBar("##tabs"))
+    {
+      if (ImGui::BeginTabItem("Risk-based Order"))
+      {
+        ImGui::NewLine();
+
+        ImGui::InputFloat("Price:", &postOrderData.price);
+
+        float risk = 100.0f;
+        ImGui::Text("Risk: $%.2f", risk);
+
+        static float lod_offset = 1.f;
+        ImGui::InputFloat("Lod Offset:", &lod_offset);
+
+        quantity = (int)(risk / lod_offset);
+        ImGui::Text("Quantity (Computed): %d", quantity);
+
+        ImGui::NewLine();
+        ImGui::Text("Total Spend: %g", quantity * postOrderData.price);
+
+        if (ImGui::Button("Submit", ImVec2(-1.f, 20.f)))
+        {
+          postOrderData.conid = gFreshOrderConid;
+          postOrderData.orderType = current_order_type;
+          postOrderData.buy = current_action == "BUY";
+          postOrderData.quantity = (float)quantity;
+          postOrderCoroHandle = create_managed_coroutine(PostOrders, &postOrderData);
+        }
+        ImGui::Separator();
+
+        if (postOrderData.success)
+        {
+          ImGui::TextColored(ImVec4(0, 1, 0, 1), "Order submitted successfully! Order ID: %s",
+                             postOrderData.order_id.c_str());
+          ImGui::TextColored(ImVec4(0, 1, 0, 1), postOrderData.order_status.c_str());
+        }
+        else if (!postOrderData.success && !postOrderData.order_status.empty())
+        {
+          ImGui::TextColored(ImVec4(1, 0, 0, 1), "Order submission failed! Error: \n %s",
+                             postOrderData.order_status.c_str());
+        }
+
+        ImGui::EndTabItem();
+      }
+
+      if (ImGui::BeginTabItem("Standard Order"))
+      { 
+        ImGui::NewLine();
+
+        ImGui::InputFloat("Price:", &postOrderData.price);
+        ImGui::InputInt("Quantity:", &quantity);
+
+        ImGui::NewLine();
+        ImGui::Text("Total Spend: %g", quantity * postOrderData.price);
+
+        if (ImGui::Button("Submit", ImVec2(-1.f, 20.f)))
+        {
+          postOrderData.conid = gFreshOrderConid;
+          postOrderData.orderType = current_order_type;
+          postOrderData.buy = current_action == "BUY";
+          postOrderData.quantity = (float)quantity;
+          postOrderCoroHandle = create_managed_coroutine(PostOrders, &postOrderData);
+        }
+        ImGui::Separator();
+
+        if (postOrderData.success)
+        {
+          ImGui::TextColored(ImVec4(0, 1, 0, 1), "Order submitted successfully! Order ID: %s",
+                             postOrderData.order_id.c_str());
+          ImGui::TextColored(ImVec4(0, 1, 0, 1), postOrderData.order_status.c_str());
+        }
+        else if (!postOrderData.success && !postOrderData.order_status.empty())
+        {
+          ImGui::TextColored(ImVec4(1, 0, 0, 1), "Order submission failed! Error: \n %s",
+                             postOrderData.order_status.c_str());
+        }
+
+        ImGui::EndTabItem();
+      }
+      ImGui::EndTabBar();
+    }
+
+    
+  }
+  ImGui::End();
+
+  if (postOrderCoroHandle != -1)
+  {
+    mco_coro* co = get_coroutine(postOrderCoroHandle);
+    if (!co || mco_status(co) == MCO_DEAD)
+    {
+      destroy_coroutine(postOrderCoroHandle);
+      postOrderCoroHandle = -1;
+    }
   }
 }
 
@@ -777,7 +968,7 @@ void MainState()
         ImGui::TableNextColumn();
 
         ImGui::PushID(i);
-        if (ImGui::Button("Add", ImVec2(-1.f, 30.f)))
+        if (ImGui::Button("Add", ImVec2(-1.f, 20.f)))
         {
           // no repeats
           bool found = false;
@@ -792,6 +983,12 @@ void MainState()
           if (!found)
             chartheaders.push_back({c.conid, symbol, c.exchange});
         }
+
+        if (ImGui::Button("FreshOrder", ImVec2(-1.f, 20.f)))
+        {
+          gFreshOrderConid = c.conid;
+          gFreshOrderTicker = ticker_result;
+        }
         ImGui::PopID();
       }
       ImGui::EndTable();
@@ -804,7 +1001,7 @@ void MainState()
   static std::unordered_map<int, StockChartData> s_chartData;
   static std::unordered_set<int> s_active_conid_thisframe;
   static std::unordered_set<int> s_to_remove_conid_thisframe;
-  
+
   s_active_conid_thisframe.clear();
   s_to_remove_conid_thisframe.clear();
 
@@ -853,7 +1050,7 @@ void MainState()
 
             PlotStockChart(chartData.mMarketDataResult.data);
           }
-          
+
           ImGui::EndTabItem();
         }
 
@@ -904,7 +1101,7 @@ void MainState()
           }
         }
         s_chartData.erase(conid);
-        
+
         for (int i = 0; i < chartheaders.size(); ++i)
         {
           if (chartheaders[i].mConnId == conid)
@@ -980,4 +1177,7 @@ void MainState()
 
   // order window
   OrderWindowUI();
+
+  // fresh order window
+  FreshOrderWindowUI();
 }

@@ -13,6 +13,7 @@
 #include <tchar.h>
 #include "naett/naett.h"
 #include "trading_imgui.h"
+#include "im_api.h"
 
 #include "coroutine/coroutine_mgt.h"
 
@@ -150,7 +151,10 @@ int main(int, char**)
         {
           bool connected = ConnectingState();
           if (connected)
+          {
             gConnectionState = 1;
+            create_managed_coroutine(PostSuppressQuestions, nullptr);
+          }
         }
         else
         {
