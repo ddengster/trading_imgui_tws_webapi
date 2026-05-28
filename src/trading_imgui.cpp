@@ -581,64 +581,151 @@ void FreshOrderWindowUI()
   ImGui::SetNextWindowPos(ImVec2(800, 400), ImGuiCond_FirstUseEver);
   if (ImGui::Begin(n))
   {
-    ImGui::NewLine();
-
-    ImGui::InputFloat("Price:", &postOrderData.price);
-    ImGui::InputInt("Quantity:", &quantity);
-
-    const char* possible_actions[] = {"BUY", "SELL"};
-
-    static const char* current_action = possible_actions[0];
-    if (ImGui::BeginCombo("Action", current_action))
+    if (ImGui::BeginTabBar("##tabs"))
     {
-      for (int n = 0; n < IM_ARRAYSIZE(possible_actions); n++)
+      if (ImGui::BeginTabItem("Risk-based Order"))
       {
-        bool is_selected = (current_action == possible_actions[n]);
-        if (ImGui::Selectable(possible_actions[n], is_selected))
-          current_action = possible_actions[n];
-        if (is_selected)
-          ImGui::SetItemDefaultFocus();
+        ImGui::NewLine();
+
+        ImGui::InputFloat("Price:", &postOrderData.price);
+
+        float risk = 100.0f;
+        ImGui::Text("Risk: $%.2f", risk);
+
+        static float lod_offset = 1.f;
+        ImGui::InputFloat("Lod Offset:", &lod_offset);
+
+        quantity = (int)(risk / lod_offset);
+        ImGui::Text("Quantity (Computed): %d", quantity);
+
+        const char* possible_actions[] = {"BUY", "SELL"};
+        static const char* current_action = possible_actions[0];
+
+        if (ImGui::BeginCombo("Action", current_action))
+        {
+          for (int n = 0; n < IM_ARRAYSIZE(possible_actions); n++)
+          {
+            bool is_selected = (current_action == possible_actions[n]);
+            if (ImGui::Selectable(possible_actions[n], is_selected))
+              current_action = possible_actions[n];
+            if (is_selected)
+              ImGui::SetItemDefaultFocus();
+          }
+          ImGui::EndCombo();
+        }
+
+        static const char* possible_order_types[] = {"LMT"};
+        static const char* current_order_type = possible_order_types[0];
+        if (ImGui::BeginCombo("Order Type", current_order_type))
+        {
+          for (int n = 0; n < IM_ARRAYSIZE(possible_order_types); n++)
+          {
+            bool is_selected = (current_order_type == possible_order_types[n]);
+            if (ImGui::Selectable(possible_order_types[n], is_selected))
+              current_order_type = possible_order_types[n];
+            if (is_selected)
+              ImGui::SetItemDefaultFocus();
+          }
+          ImGui::EndCombo();
+        }
+
+        ImGui::NewLine();
+        ImGui::Text("Total Spend: %g", quantity * postOrderData.price);
+
+        if (ImGui::Button("Submit", ImVec2(-1.f, 20.f)))
+        {
+          postOrderData.conid = gFreshOrderConid;
+          postOrderData.orderType = current_order_type;
+          postOrderData.buy = current_action == "BUY";
+          postOrderData.quantity = (float)quantity;
+          postOrderCoroHandle = create_managed_coroutine(PostOrders, &postOrderData);
+        }
+        ImGui::Separator();
+
+        if (postOrderData.success)
+        {
+          ImGui::TextColored(ImVec4(0, 1, 0, 1), "Order submitted successfully! Order ID: %s",
+                             postOrderData.order_id.c_str());
+          ImGui::TextColored(ImVec4(0, 1, 0, 1), postOrderData.order_status.c_str());
+        }
+        else if (!postOrderData.success && !postOrderData.order_status.empty())
+        {
+          ImGui::TextColored(ImVec4(1, 0, 0, 1), "Order submission failed! Error: \n %s",
+                             postOrderData.order_status.c_str());
+        }
+
+        ImGui::EndTabItem();
       }
-      ImGui::EndCombo();
-    }
 
-    static const char* possible_order_types[] = {"LMT"};
-    static const char* current_order_type = possible_order_types[0];
-    if (ImGui::BeginCombo("Order Type", current_order_type))
-    {
-      for (int n = 0; n < IM_ARRAYSIZE(possible_order_types); n++)
-      {
-        bool is_selected = (current_order_type == possible_order_types[n]);
-        if (ImGui::Selectable(possible_order_types[n], is_selected))
-          current_order_type = possible_order_types[n];
-        if (is_selected)
-          ImGui::SetItemDefaultFocus();
+      if (ImGui::BeginTabItem("Standard Order"))
+      { 
+        ImGui::NewLine();
+
+        ImGui::InputFloat("Price:", &postOrderData.price);
+        ImGui::InputInt("Quantity:", &quantity);
+
+        const char* possible_actions[] = {"BUY", "SELL"};
+        static const char* current_action = possible_actions[0];
+
+        if (ImGui::BeginCombo("Action", current_action))
+        {
+          for (int n = 0; n < IM_ARRAYSIZE(possible_actions); n++)
+          {
+            bool is_selected = (current_action == possible_actions[n]);
+            if (ImGui::Selectable(possible_actions[n], is_selected))
+              current_action = possible_actions[n];
+            if (is_selected)
+              ImGui::SetItemDefaultFocus();
+          }
+          ImGui::EndCombo();
+        }
+
+        static const char* possible_order_types[] = {"LMT"};
+        static const char* current_order_type = possible_order_types[0];
+        if (ImGui::BeginCombo("Order Type", current_order_type))
+        {
+          for (int n = 0; n < IM_ARRAYSIZE(possible_order_types); n++)
+          {
+            bool is_selected = (current_order_type == possible_order_types[n]);
+            if (ImGui::Selectable(possible_order_types[n], is_selected))
+              current_order_type = possible_order_types[n];
+            if (is_selected)
+              ImGui::SetItemDefaultFocus();
+          }
+          ImGui::EndCombo();
+        }
+
+        ImGui::NewLine();
+        ImGui::Text("Total Spend: %g", quantity * postOrderData.price);
+
+        if (ImGui::Button("Submit", ImVec2(-1.f, 20.f)))
+        {
+          postOrderData.conid = gFreshOrderConid;
+          postOrderData.orderType = current_order_type;
+          postOrderData.buy = current_action == "BUY";
+          postOrderData.quantity = (float)quantity;
+          postOrderCoroHandle = create_managed_coroutine(PostOrders, &postOrderData);
+        }
+        ImGui::Separator();
+
+        if (postOrderData.success)
+        {
+          ImGui::TextColored(ImVec4(0, 1, 0, 1), "Order submitted successfully! Order ID: %s",
+                             postOrderData.order_id.c_str());
+          ImGui::TextColored(ImVec4(0, 1, 0, 1), postOrderData.order_status.c_str());
+        }
+        else if (!postOrderData.success && !postOrderData.order_status.empty())
+        {
+          ImGui::TextColored(ImVec4(1, 0, 0, 1), "Order submission failed! Error: \n %s",
+                             postOrderData.order_status.c_str());
+        }
+
+        ImGui::EndTabItem();
       }
-      ImGui::EndCombo();
+      ImGui::EndTabBar();
     }
 
-    ImGui::NewLine();
-
-    if (ImGui::Button("Submit", ImVec2(-1.f, 20.f)))
-    {
-      postOrderData.conid = gFreshOrderConid;
-      postOrderData.orderType = current_order_type;
-      postOrderData.buy = current_action == "BUY";
-      postOrderData.quantity = (float)quantity;
-      postOrderCoroHandle = create_managed_coroutine(PostOrders, &postOrderData);
-    }
-
-    if (postOrderData.success)
-    {
-      ImGui::TextColored(ImVec4(0, 1, 0, 1), "Order submitted successfully! Order ID: %s",
-                         postOrderData.order_id.c_str());
-      ImGui::TextColored(ImVec4(0, 1, 0, 1), postOrderData.order_status.c_str());
-    }
-    else if (!postOrderData.success && !postOrderData.order_status.empty())
-    {
-      ImGui::TextColored(ImVec4(1, 0, 0, 1), "Order submission failed! Error: \n %s",
-                         postOrderData.order_status.c_str());
-    }
+    
   }
   ImGui::End();
 
