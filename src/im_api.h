@@ -115,6 +115,13 @@ struct PostOrderData
   bool success = false;
 };
 
+struct CancelOrderData
+{
+  int orderId;
+  bool success = false;
+  int coroHandle = -1;
+};
+
 // --- Coroutine functions ---
 
 void PollAuthStatus(mco_coro* co);
@@ -127,3 +134,4 @@ void PollMarketDataSnapshot(mco_coro* co);
 void PollConId(mco_coro* co);
 void PollOrders(mco_coro* co);
 void PostOrders(mco_coro* co);
+void CancelOrder(mco_coro* co);

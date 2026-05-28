@@ -13,6 +13,7 @@
 #define BASE_URL "https://localhost:5000/v1/api"
 
 extern std::string gAccountId;
+extern std::unordered_map<int, CancelOrderData> gPendingCancels;
 
 struct ReqRes
 {
@@ -679,6 +680,55 @@ void PostOrders(mco_coro* co)
     printf("Error placing order: HTTP %d\n", status);
     printf("%s\n", (const char*)body);
     data->success = false;
+  }
+
+  rr.cleanup();
+}
+
+void CancelOrder(mco_coro* co)
+{
+  int orderId = (int)mco_get_user_data(co);
+  
+  CancelOrderData& pc = gPendingCancels[orderId];
+
+  char url[512] = {};
+  snprintf(url, sizeof(url), BASE_URL "/iserver/account/%s/order/%d", gAccountId.c_str(), orderId);
+
+  ReqRes rr;
+  naettOption* options[] = {naettMethod("DELETE")};
+  rr.req = naettRequestWithOptions(url, 1, (const naettOption**)&options);
+  rr.res = naettMake(rr.req);
+
+  if (!rr.valid())
+    return;
+
+  yield();
+  yield_until_true([](void* ud) { return naettComplete((naettRes*)ud) != 0; }, rr.res);
+
+  int status = naettGetStatus(rr.res);
+  if (status == 200)
+  {
+    int sz = 0;
+    const void* body = naettGetBody(rr.res, &sz);
+    JSON_Value* val = json_parse_string((const char*)body);
+    JSON_Object* obj = json_value_get_object(val);
+    if (obj)
+    {
+      const char* msg = json_object_get_string(obj, "message");
+      if (msg)
+        printf(msg);
+    }
+    json_value_free(val);
+    pc.success = true;
+  }
+  else
+  {
+    int sz = 0;
+    const void* body = naettGetBody(rr.res, &sz);
+    printf("Error cancelling order: HTTP %d\n", status);
+    if (body && sz > 0) 
+      printf("%s\n", (const char*)body);
+    pc.success = false;
   }
 
   rr.cleanup();

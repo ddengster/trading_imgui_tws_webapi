@@ -21,6 +21,8 @@ std::string gAccountId;
 std::string gFreshOrderTicker;
 int gFreshOrderConid = -1;
 
+std::unordered_map<int, CancelOrderData> gPendingCancels;
+
 bool ConnectingState()
 {
   ImGui::Begin("Connecting", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
@@ -465,11 +467,16 @@ void OrderWindowUI()
 
       ImGui::TableHeadersRow();
 
+      auto non_open_order = [](const std::string& status) -> bool
+      {
+        return status == "Filled" || status == "Cancelled" || status == "Inactive";
+      };
+
       for (int i = 0; i < (int)ordersResult.orders.size(); ++i)
       {
         auto& o = ordersResult.orders[i];
 
-        if (show_open_orders_only && o.status == "Filled")
+        if (show_open_orders_only && non_open_order(o.status))
           continue;
 
         ImGui::TableNextRow();
@@ -500,17 +507,27 @@ void OrderWindowUI()
 
         snprintf(t, sizeof(t), "%.2f", o.stopPrice);
         ImGui::Text(t);
-        
+
         ImGui::TableNextColumn();
         ImGui::Text(o.status.c_str());
 
         ImGui::TableNextColumn();
-        if (o.status != "Filled" && ImGui::Button("Cancel"))
+        if (!non_open_order(o.status))
         {
-          /* CancelOrderData data;
-          data.orderId = o.orderId;
-          create_managed_coroutine(CancelOrder, &data);
-          */
+          auto it = gPendingCancels.find(o.orderId);
+          bool cancelling = it != gPendingCancels.end();
+          if (!cancelling && ImGui::Button("Cancel"))
+          {
+            CancelOrderData pc;
+            pc.orderId = o.orderId;
+            pc.coroHandle = create_managed_coroutine(CancelOrder, (void*)o.orderId);
+            gPendingCancels[o.orderId] = pc;
+          }
+          if (cancelling)
+          {
+            ImGui::SameLine();
+            ImGui::TextColored(ImVec4(1, 1, 0, 1), "cancelling...");
+          }
         }
       }
 
@@ -525,9 +542,27 @@ void OrderWindowUI()
     {
       ImGui::TextColored(ImVec4(1, 1, 0, 1), "No orders");
     }
-
   }
   ImGui::End();
+
+  for (auto it = gPendingCancels.begin(); it != gPendingCancels.end();)
+  {
+    auto& pc = it->second;
+    mco_coro* co = get_coroutine(pc.coroHandle);
+    if (!co || mco_status(co) == MCO_DEAD)
+    {
+      destroy_coroutine(pc.coroHandle);
+      if (pc.success)
+        printf("Order %d cancelled successfully\n", pc.orderId);
+      else
+        printf("Failed to cancel order %d\n", pc.orderId);
+      it = gPendingCancels.erase(it);
+    }
+    else
+    {
+      ++it;
+    }
+  }
 }
 
 void FreshOrderWindowUI()
@@ -604,7 +639,6 @@ void FreshOrderWindowUI()
       ImGui::TextColored(ImVec4(1, 0, 0, 1), "Order submission failed! Error: %s",
                          postOrderData.order_status.c_str());
     }
-
   }
   ImGui::End();
 
