@@ -581,6 +581,37 @@ void FreshOrderWindowUI()
   ImGui::SetNextWindowPos(ImVec2(800, 400), ImGuiCond_FirstUseEver);
   if (ImGui::Begin(n))
   {
+    const char* possible_actions[] = {"BUY", "SELL"};
+    static const char* current_action = possible_actions[0];
+
+    if (ImGui::BeginCombo("Action", current_action))
+    {
+      for (int n = 0; n < IM_ARRAYSIZE(possible_actions); n++)
+      {
+        bool is_selected = (current_action == possible_actions[n]);
+        if (ImGui::Selectable(possible_actions[n], is_selected))
+          current_action = possible_actions[n];
+        if (is_selected)
+          ImGui::SetItemDefaultFocus();
+      }
+      ImGui::EndCombo();
+    }
+
+    static const char* possible_order_types[] = {"LMT"};
+    static const char* current_order_type = possible_order_types[0];
+    if (ImGui::BeginCombo("Order Type", current_order_type))
+    {
+      for (int n = 0; n < IM_ARRAYSIZE(possible_order_types); n++)
+      {
+        bool is_selected = (current_order_type == possible_order_types[n]);
+        if (ImGui::Selectable(possible_order_types[n], is_selected))
+          current_order_type = possible_order_types[n];
+        if (is_selected)
+          ImGui::SetItemDefaultFocus();
+      }
+      ImGui::EndCombo();
+    }
+
     if (ImGui::BeginTabBar("##tabs"))
     {
       if (ImGui::BeginTabItem("Risk-based Order"))
@@ -597,37 +628,6 @@ void FreshOrderWindowUI()
 
         quantity = (int)(risk / lod_offset);
         ImGui::Text("Quantity (Computed): %d", quantity);
-
-        const char* possible_actions[] = {"BUY", "SELL"};
-        static const char* current_action = possible_actions[0];
-
-        if (ImGui::BeginCombo("Action", current_action))
-        {
-          for (int n = 0; n < IM_ARRAYSIZE(possible_actions); n++)
-          {
-            bool is_selected = (current_action == possible_actions[n]);
-            if (ImGui::Selectable(possible_actions[n], is_selected))
-              current_action = possible_actions[n];
-            if (is_selected)
-              ImGui::SetItemDefaultFocus();
-          }
-          ImGui::EndCombo();
-        }
-
-        static const char* possible_order_types[] = {"LMT"};
-        static const char* current_order_type = possible_order_types[0];
-        if (ImGui::BeginCombo("Order Type", current_order_type))
-        {
-          for (int n = 0; n < IM_ARRAYSIZE(possible_order_types); n++)
-          {
-            bool is_selected = (current_order_type == possible_order_types[n]);
-            if (ImGui::Selectable(possible_order_types[n], is_selected))
-              current_order_type = possible_order_types[n];
-            if (is_selected)
-              ImGui::SetItemDefaultFocus();
-          }
-          ImGui::EndCombo();
-        }
 
         ImGui::NewLine();
         ImGui::Text("Total Spend: %g", quantity * postOrderData.price);
@@ -663,37 +663,6 @@ void FreshOrderWindowUI()
 
         ImGui::InputFloat("Price:", &postOrderData.price);
         ImGui::InputInt("Quantity:", &quantity);
-
-        const char* possible_actions[] = {"BUY", "SELL"};
-        static const char* current_action = possible_actions[0];
-
-        if (ImGui::BeginCombo("Action", current_action))
-        {
-          for (int n = 0; n < IM_ARRAYSIZE(possible_actions); n++)
-          {
-            bool is_selected = (current_action == possible_actions[n]);
-            if (ImGui::Selectable(possible_actions[n], is_selected))
-              current_action = possible_actions[n];
-            if (is_selected)
-              ImGui::SetItemDefaultFocus();
-          }
-          ImGui::EndCombo();
-        }
-
-        static const char* possible_order_types[] = {"LMT"};
-        static const char* current_order_type = possible_order_types[0];
-        if (ImGui::BeginCombo("Order Type", current_order_type))
-        {
-          for (int n = 0; n < IM_ARRAYSIZE(possible_order_types); n++)
-          {
-            bool is_selected = (current_order_type == possible_order_types[n]);
-            if (ImGui::Selectable(possible_order_types[n], is_selected))
-              current_order_type = possible_order_types[n];
-            if (is_selected)
-              ImGui::SetItemDefaultFocus();
-          }
-          ImGui::EndCombo();
-        }
 
         ImGui::NewLine();
         ImGui::Text("Total Spend: %g", quantity * postOrderData.price);
