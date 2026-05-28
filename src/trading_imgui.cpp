@@ -451,7 +451,7 @@ void OrderWindowUI()
     static bool show_open_orders_only = true;
     ImGui::Checkbox("Open Orders Only", &show_open_orders_only);
 
-    if (ImGui::BeginTable("orders", 8, ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable))
+    if (ImGui::BeginTable("orders", 9, ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable))
     {
       ImGui::TableSetupColumn("LastExecTime");
       ImGui::TableSetupColumn("Symbol");
@@ -461,6 +461,7 @@ void OrderWindowUI()
       ImGui::TableSetupColumn("Limit Price");
       ImGui::TableSetupColumn("Stop Price");
       ImGui::TableSetupColumn("Status");
+      ImGui::TableSetupColumn("Actions");
 
       ImGui::TableHeadersRow();
 
@@ -499,9 +500,18 @@ void OrderWindowUI()
 
         snprintf(t, sizeof(t), "%.2f", o.stopPrice);
         ImGui::Text(t);
+        
         ImGui::TableNextColumn();
-
         ImGui::Text(o.status.c_str());
+
+        ImGui::TableNextColumn();
+        if (o.status != "Filled" && ImGui::Button("Cancel"))
+        {
+          /* CancelOrderData data;
+          data.orderId = o.orderId;
+          create_managed_coroutine(CancelOrder, &data);
+          */
+        }
       }
 
       ImGui::EndTable();
