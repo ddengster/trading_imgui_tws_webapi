@@ -560,10 +560,7 @@ void PostOrders(mco_coro* co)
         json_object_set_string(order_obj, "secType", buf);
       }
 
-      json_object_set_boolean(order_obj, "manualIndicator", true);
-      json_object_set_string(order_obj, "extOperator", gAccountId.c_str());
-      
-      json_object_set_string(order_obj, "cOID", "AAPL-BUY-1");
+      //json_object_set_string(order_obj, "cOID", "AAPL-BUY-1");
       json_object_set_null(order_obj, "parentId");
 
       json_object_set_string(order_obj, "orderType", data->orderType.c_str());
@@ -729,6 +726,63 @@ void CancelOrder(mco_coro* co)
     if (body && sz > 0) 
       printf("%s\n", (const char*)body);
     pc.success = false;
+  }
+
+  rr.cleanup();
+}
+
+void PostSuppressQuestions(mco_coro* co)
+{
+  char json_buf[256] = {};
+  {
+    JSON_Value* val = json_value_init_object();
+    auto obj = json_value_get_object(val);
+
+    JSON_Value* arry = json_value_init_array();
+    json_array_append_string(json_value_get_array(arry), "o163");
+    json_array_append_string(json_value_get_array(arry), "o354");
+    json_array_append_string(json_value_get_array(arry), "o383");
+    json_array_append_string(json_value_get_array(arry), "o451");
+    json_array_append_string(json_value_get_array(arry), "o10153");
+    json_array_append_string(json_value_get_array(arry), "o10331");
+    json_array_append_string(json_value_get_array(arry), "o10336");
+    json_array_append_string(json_value_get_array(arry), "p12");
+    json_object_set_value(obj, "messageIds", arry);
+
+    JSON_Status ret = json_serialize_to_buffer(val, json_buf, sizeof(json_buf));
+    if (ret != JSONSuccess)
+    {
+      json_value_free(val);
+      return;
+    }
+    json_value_free(val);
+  }
+
+  ReqRes rr;
+  naettOption* options[] = {naettMethod("POST"), naettHeader("Content-Type", "application/json"),
+                            naettBody(json_buf, strlen(json_buf))};
+
+  rr.req = naettRequestWithOptions(BASE_URL "/iserver/questions/suppress", 3, (const naettOption**)&options);
+  rr.res = naettMake(rr.req);
+
+  if (!rr.valid())
+    return;
+
+  yield();
+  yield_until_true([](void* ud) { return naettComplete((naettRes*)ud) != 0; }, rr.res);
+
+  int status = naettGetStatus(rr.res);
+  if (status == 200)
+  {
+    printf("Successfully suppressed questions\n");
+  }
+  else
+  {
+    int sz = 0;
+    const void* body = naettGetBody(rr.res, &sz);
+    printf("Error suppressing questions: HTTP %d\n", status);
+    if (body && sz > 0)
+      printf("%s\n", (const char*)body);
   }
 
   rr.cleanup();

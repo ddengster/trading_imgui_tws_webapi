@@ -636,7 +636,7 @@ void FreshOrderWindowUI()
     }
     else if (!postOrderData.success && !postOrderData.order_status.empty())
     {
-      ImGui::TextColored(ImVec4(1, 0, 0, 1), "Order submission failed! Error: %s",
+      ImGui::TextColored(ImVec4(1, 0, 0, 1), "Order submission failed! Error: \n %s",
                          postOrderData.order_status.c_str());
     }
   }

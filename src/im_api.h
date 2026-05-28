@@ -122,6 +122,11 @@ struct CancelOrderData
   int coroHandle = -1;
 };
 
+struct SuppressQuestionsData
+{
+  bool success = false;
+};
+
 // --- Coroutine functions ---
 
 void PollAuthStatus(mco_coro* co);
@@ -135,3 +140,4 @@ void PollConId(mco_coro* co);
 void PollOrders(mco_coro* co);
 void PostOrders(mco_coro* co);
 void CancelOrder(mco_coro* co);
+void PostSuppressQuestions(mco_coro* co);
