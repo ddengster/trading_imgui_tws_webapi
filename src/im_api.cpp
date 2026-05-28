@@ -553,29 +553,40 @@ void PostOrders(mco_coro* co)
       {
         char buf[64] = {};
         snprintf(buf, sizeof(buf), "%ld@SMART", data->conid);
-        //json_object_set_string(order_obj, "conidex", buf);
+        json_object_set_string(order_obj, "conidex", buf);
 
-        //snprintf(buf, sizeof(buf), "%ld@SMART", data->conid);
-        //json_object_set_string(order_obj, "secType", buf);
+        snprintf(buf, sizeof(buf), "%ld:STK", data->conid);
+        json_object_set_string(order_obj, "secType", buf);
       }
 
       json_object_set_boolean(order_obj, "manualIndicator", true);
-      json_object_set_string(order_obj, "extOperator", "test123");
-      // json_object_set_string(order_obj, "cOID", "testorder");
+      json_object_set_string(order_obj, "extOperator", gAccountId.c_str());
+      
+      json_object_set_string(order_obj, "cOID", "AAPL-BUY-1");
+      json_object_set_null(order_obj, "parentId");
+
       json_object_set_string(order_obj, "orderType", data->orderType.c_str());
+      json_object_set_string(order_obj, "listingExchange", "NASDAQ");
+      json_object_set_boolean(order_obj, "isSingleGroup", true);
       json_object_set_boolean(order_obj, "outsideRTH", true);
 
       json_object_set_number(order_obj, "price", (double)data->price);
-      json_object_set_number(order_obj, "aux_price", (double)data->aux_price);
+      //if (data->orderType == "STOP_LIMIT" || data->orderType == "TRAILLMT")
+      json_object_set_number(order_obj, "auxPrice", (double)data->aux_price);
+
       json_object_set_string(order_obj, "side", data->buy ? "BUY" : "SELL");
+      json_object_set_string(order_obj, "ticker", "AAPL");
       json_object_set_string(order_obj, "tif", "GTC");
+      //json_object_set_number(order_obj, "trailingAmt", 0.0);
       json_object_set_number(order_obj, "quantity", (double)data->quantity);
+      json_object_set_boolean(order_obj, "allOrNone", false);
+      json_object_set_string(order_obj, "referrer", "QuickTrade");
 
       json_array_append_value(json_value_get_array(arry), order);
     }
     json_object_set_value(base_obj, "orders", arry);
 
-    JSON_Status ret = json_serialize_to_buffer_pretty(base, json_buf, sizeof(json_buf));
+    JSON_Status ret = json_serialize_to_buffer(base, json_buf, sizeof(json_buf));
     if (ret != JSONSuccess)
     {
       json_value_free(base);
@@ -592,7 +603,7 @@ void PostOrders(mco_coro* co)
 
   char url[512] = {};
   snprintf(url, sizeof(url), BASE_URL "/iserver/account/%s/orders", gAccountId.c_str());
-  rr.req = naettRequestWithOptions(url, 1, (const naettOption**)&options);
+  rr.req = naettRequestWithOptions(url, 3, (const naettOption**)&options);
   rr.res = naettMake(rr.req);
 
   if (!rr.valid())
@@ -620,19 +631,46 @@ void PostOrders(mco_coro* co)
       if (obj)
       {
         const char* oid = json_object_get_string(obj, "order_id");
-        if (oid)
+        if (oid && strlen(oid) > 0)
+        {
           data->order_id = oid;
-        const char* ost = json_object_get_string(obj, "order_status");
-        if (ost)
-          data->order_status = ost;
-        const char* emsg = json_object_get_string(obj, "encrypt_message");
-        if (emsg)
-          data->encrypt_message = emsg;
+          const char* ost = json_object_get_string(obj, "order_status");
+          if (ost)
+            data->order_status = ost;
+          const char* emsg = json_object_get_string(obj, "encrypt_message");
+          if (emsg)
+            data->encrypt_message = emsg;
+          data->success = true;
+        }
+        else
+        {
+          JSON_Array* msg_arr = json_object_get_array(obj, "message");
+          if (msg_arr && json_array_get_count(msg_arr) > 0)
+          {
+            const char* err = json_array_get_string(msg_arr, 0);
+            if (err) data->order_status = err;
+          }
+          if (data->order_status.empty())
+          {
+            const char* msg = json_object_get_string(obj, "message");
+            if (msg) data->order_status = msg;
+          }
+          data->success = false;
+        }
+      }
+    }
+    else
+    {
+      JSON_Object* obj = json_value_get_object(val);
+      if (obj)
+      {
+        const char* err = json_object_get_string(obj, "error");
+        if (err) data->order_status = err;
+        data->success = false;
       }
     }
 
     json_value_free(val);
-    data->success = true;
   }
   else
   {
