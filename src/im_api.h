@@ -32,13 +32,6 @@ struct AccountIdResult
   bool success = false;
 };
 
-struct PositionsResult
-{
-  std::string accountId;
-  std::vector<PositionData> positions;
-  bool success = false;
-};
-
 struct LedgerResult
 {
   std::string accountId;
