@@ -575,9 +575,8 @@ void FreshOrderWindowUI()
   char n[32] = {};
   snprintf(n, sizeof(n), "Fresh Order - %s(%d)", gFreshOrderTicker.c_str(), gFreshOrderConid);
 
-  static PostOrderData postOrderData;
   static int quantity = 1;
-  static int postOrderCoroHandle = -1;
+  static float price = 1.f;
 
   ImGui::SetNextWindowSize(ImVec2(600, 300), ImGuiCond_FirstUseEver);
   ImGui::SetNextWindowPos(ImVec2(800, 400), ImGuiCond_FirstUseEver);
@@ -620,7 +619,7 @@ void FreshOrderWindowUI()
       {
         ImGui::NewLine();
 
-        ImGui::InputFloat("Price:", &postOrderData.price);
+        ImGui::InputFloat("Price:", &price);
 
         float risk = 100.0f;
         ImGui::Text("Risk: $%.2f", risk);
@@ -632,29 +631,20 @@ void FreshOrderWindowUI()
         ImGui::Text("Quantity (Computed): %d", quantity);
 
         ImGui::NewLine();
-        ImGui::Text("Total Spend: %g", quantity * postOrderData.price);
+        ImGui::Text("Total Spend: %g", quantity * price);
 
         if (ImGui::Button("Submit", ImVec2(-1.f, 20.f)))
         {
-          postOrderData.conid = gFreshOrderConid;
-          postOrderData.orderType = current_order_type;
-          postOrderData.buy = current_action == "BUY";
-          postOrderData.quantity = (float)quantity;
-          postOrderCoroHandle = create_managed_coroutine(PostOrders, &postOrderData);
+          gGlobalData.mPendingPostOrders.push_back({});
+          auto& pod = gGlobalData.mPendingPostOrders.back();
+          pod.conid = gFreshOrderConid;
+          pod.orderType = current_order_type;
+          pod.buy = current_action == "BUY";
+          pod.quantity = (float)quantity;
+          pod.price = price;
+          pod.coroHandle = create_managed_coroutine(PostOrders, &pod);
         }
         ImGui::Separator();
-
-        if (postOrderData.success)
-        {
-          ImGui::TextColored(ImVec4(0, 1, 0, 1), "Order submitted successfully! Order ID: %s",
-                             postOrderData.order_id.c_str());
-          ImGui::TextColored(ImVec4(0, 1, 0, 1), postOrderData.order_status.c_str());
-        }
-        else if (!postOrderData.success && !postOrderData.order_status.empty())
-        {
-          ImGui::TextColored(ImVec4(1, 0, 0, 1), "Order submission failed! Error: \n %s",
-                             postOrderData.order_status.c_str());
-        }
 
         ImGui::EndTabItem();
       }
@@ -663,50 +653,86 @@ void FreshOrderWindowUI()
       { 
         ImGui::NewLine();
 
-        ImGui::InputFloat("Price:", &postOrderData.price);
+        ImGui::InputFloat("Price:", &price);
         ImGui::InputInt("Quantity:", &quantity);
 
         ImGui::NewLine();
-        ImGui::Text("Total Spend: %g", quantity * postOrderData.price);
+        ImGui::Text("Total Spend: %g", quantity * price);
 
         if (ImGui::Button("Submit", ImVec2(-1.f, 20.f)))
         {
-          postOrderData.conid = gFreshOrderConid;
-          postOrderData.orderType = current_order_type;
-          postOrderData.buy = current_action == "BUY";
-          postOrderData.quantity = (float)quantity;
-          postOrderCoroHandle = create_managed_coroutine(PostOrders, &postOrderData);
+          gGlobalData.mPendingPostOrders.push_back({});
+          auto& pod = gGlobalData.mPendingPostOrders.back();
+          pod.conid = gFreshOrderConid;
+          pod.orderType = current_order_type;
+          pod.buy = current_action == "BUY";
+          pod.quantity = (float)quantity;
+          pod.price = price;
+          pod.coroHandle = create_managed_coroutine(PostOrders, &pod);
         }
         ImGui::Separator();
-
-        if (postOrderData.success)
-        {
-          ImGui::TextColored(ImVec4(0, 1, 0, 1), "Order submitted successfully! Order ID: %s",
-                             postOrderData.order_id.c_str());
-          ImGui::TextColored(ImVec4(0, 1, 0, 1), postOrderData.order_status.c_str());
-        }
-        else if (!postOrderData.success && !postOrderData.order_status.empty())
-        {
-          ImGui::TextColored(ImVec4(1, 0, 0, 1), "Order submission failed! Error: \n %s",
-                             postOrderData.order_status.c_str());
-        }
 
         ImGui::EndTabItem();
       }
       ImGui::EndTabBar();
     }
 
-    
+    // show status of all pending/completed orders
+    if (!gGlobalData.mPendingPostOrders.empty())
+    {
+      ImGui::Separator();
+      ImGui::Text("Orders:");
+      ImGui::Indent();
+      int idx = 0;
+      for (auto& pod : gGlobalData.mPendingPostOrders)
+      {
+        ++idx;
+        ImGui::PushID(idx);
+        if (pod.coroHandle != -1)
+        {
+          ImGui::TextColored(ImVec4(1, 1, 0, 1), "Order #%d: submitting...", idx);
+        }
+        else if (pod.success)
+        {
+          ImGui::TextColored(ImVec4(0, 1, 0, 1), "Order #%d: OK (ID: %s, status: %s)",
+                             idx, pod.order_id.c_str(), pod.order_status.c_str());
+        }
+        else if (!pod.order_status.empty())
+        {
+          ImGui::TextColored(ImVec4(1, 0, 0, 1), "Order #%d: FAILED - %s",
+                             idx, pod.order_status.c_str());
+        }
+        ImGui::PopID();
+      }
+      ImGui::Unindent();
+    }
   }
   ImGui::End();
 
-  if (postOrderCoroHandle != -1)
+  // process pending orders - check for completion
+  for (auto it = gGlobalData.mPendingPostOrders.begin(); it != gGlobalData.mPendingPostOrders.end(); )
   {
-    mco_coro* co = get_coroutine(postOrderCoroHandle);
-    if (!co || mco_status(co) == MCO_DEAD)
+    auto& pod = *it;
+    if (pod.coroHandle != -1)
     {
-      destroy_coroutine(postOrderCoroHandle);
-      postOrderCoroHandle = -1;
+      mco_coro* co = get_coroutine(pod.coroHandle);
+      if (!co || mco_status(co) == MCO_DEAD)
+      {
+        destroy_coroutine(pod.coroHandle);
+        pod.coroHandle = -1;
+      }
+    }
+    if (pod.coroHandle == -1)
+    {
+      if (pod.success)
+        printf("Order submitted successfully! Order ID: %s\n", pod.order_id.c_str());
+      else if (!pod.order_status.empty())
+        printf("Order submission failed! Error: %s\n", pod.order_status.c_str());
+      it = gGlobalData.mPendingPostOrders.erase(it);
+    }
+    else
+    {
+      ++it;
     }
   }
 }

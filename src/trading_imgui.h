@@ -49,6 +49,23 @@ struct PositionsResult
   bool success = false;
 };
 
+struct PostOrderData
+{
+  int conid;
+  std::string orderType;
+  float price = 1.f;
+  float aux_price = 0.f;
+  bool buy = true;
+  float quantity;
+
+  std::string order_id;
+  std::string order_status;
+  std::string encrypt_message;
+
+  bool success = false;
+  int coroHandle = -1;
+};
+
 struct GlobalData
 {
   int mConnectionState = 0;
@@ -57,6 +74,7 @@ struct GlobalData
   int mTodaysRisk = 100;
 
   PositionsResult mPositions;
+  std::vector<PostOrderData> mPendingPostOrders;
 };
 extern GlobalData gGlobalData;
 
