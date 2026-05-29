@@ -20,7 +20,6 @@
 std::string gFreshOrderTicker;
 int gFreshOrderConid = -1;
 
-std::unordered_map<int, CancelOrderData> gPendingCancels;
 
 bool ConnectingState()
 {
@@ -514,15 +513,15 @@ void OrderWindowUI()
         ImGui::TableNextColumn();
         if (!non_open_order(o.status))
         {
-          auto it = gPendingCancels.find(o.orderId);
-          bool cancelling = it != gPendingCancels.end();
+          auto it = gGlobalData.mPendingCancels.find(o.orderId);
+          bool cancelling = it != gGlobalData.mPendingCancels.end();
           ImGui::PushID(i);
           if (!cancelling && ImGui::Button("Cancel"))
           {
             CancelOrderData pc;
             pc.orderId = o.orderId;
             pc.coroHandle = create_managed_coroutine(CancelOrder, (void*)o.orderId);
-            gPendingCancels[o.orderId] = pc;
+            gGlobalData.mPendingCancels[o.orderId] = pc;
           }
           ImGui::PopID();
           if (cancelling)
@@ -547,7 +546,7 @@ void OrderWindowUI()
   }
   ImGui::End();
 
-  for (auto it = gPendingCancels.begin(); it != gPendingCancels.end();)
+  for (auto it = gGlobalData.mPendingCancels.begin(); it != gGlobalData.mPendingCancels.end();)
   {
     auto& pc = it->second;
     mco_coro* co = get_coroutine(pc.coroHandle);
@@ -558,7 +557,7 @@ void OrderWindowUI()
         printf("Order %d cancelled successfully\n", pc.orderId);
       else
         printf("Failed to cancel order %d\n", pc.orderId);
-      it = gPendingCancels.erase(it);
+      it = gGlobalData.mPendingCancels.erase(it);
     }
     else
     {

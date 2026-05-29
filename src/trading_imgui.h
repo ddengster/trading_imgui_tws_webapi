@@ -3,6 +3,7 @@
 
 #include "imgui.h"
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 struct PositionData
@@ -66,6 +67,13 @@ struct PostOrderData
   int coroHandle = -1;
 };
 
+struct CancelOrderData
+{
+  int orderId;
+  bool success = false;
+  int coroHandle = -1;
+};
+
 struct GlobalData
 {
   int mConnectionState = 0;
@@ -75,6 +83,7 @@ struct GlobalData
 
   PositionsResult mPositions;
   std::vector<PostOrderData> mPendingPostOrders;
+  std::unordered_map<int, CancelOrderData> mPendingCancels;
 };
 extern GlobalData gGlobalData;
 

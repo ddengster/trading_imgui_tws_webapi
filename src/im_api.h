@@ -89,13 +89,6 @@ struct OrdersResult
   bool success = false;
 };
 
-struct CancelOrderData
-{
-  int orderId;
-  bool success = false;
-  int coroHandle = -1;
-};
-
 struct SuppressQuestionsData
 {
   bool success = false;

@@ -12,7 +12,6 @@
 
 #define BASE_URL "https://localhost:5000/v1/api"
 
-extern std::unordered_map<int, CancelOrderData> gPendingCancels;
 
 struct ReqRes
 {
@@ -687,7 +686,7 @@ void CancelOrder(mco_coro* co)
 {
   int orderId = (int)mco_get_user_data(co);
   
-  CancelOrderData& pc = gPendingCancels[orderId];
+  CancelOrderData& pc = gGlobalData.mPendingCancels[orderId];
 
   char url[512] = {};
   snprintf(url, sizeof(url), BASE_URL "/iserver/account/%s/order/%d", gGlobalData.mAccountId.c_str(), orderId);
