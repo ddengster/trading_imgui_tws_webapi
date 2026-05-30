@@ -95,8 +95,8 @@ struct GlobalData
 
   int mTodaysRisk = 100;
 
-  std::string mOrderWindowTicker;
-  int mOrderWindowConid = -1;
+  std::string mPlaceOrderTicker;
+  int mPlaceOrderConid = -1;
 
   LedgerResult mLedgerResult;
   SummaryResult mSummaryResult;

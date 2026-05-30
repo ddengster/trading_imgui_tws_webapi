@@ -561,11 +561,11 @@ void OrderWindowUI()
 
 void FreshOrderWindowUI()
 {
-  if (gGlobalData.mOrderWindowConid == -1)
+  if (gGlobalData.mPlaceOrderConid == -1)
     return;
 
   char n[32] = {};
-  snprintf(n, sizeof(n), "Fresh Order - %s(%d)", gGlobalData.mOrderWindowTicker.c_str(), gGlobalData.mOrderWindowConid);
+  snprintf(n, sizeof(n), "Fresh Order - %s(%d)", gGlobalData.mPlaceOrderTicker.c_str(), gGlobalData.mPlaceOrderConid);
 
   static int quantity = 1;
   static float price = 1.f;
@@ -629,7 +629,7 @@ void FreshOrderWindowUI()
         {
           gGlobalData.mPendingPostOrders.push_back({});
           auto& pod = gGlobalData.mPendingPostOrders.back();
-          pod.conid = gGlobalData.mOrderWindowConid;
+          pod.conid = gGlobalData.mPlaceOrderConid;
           pod.orderType = current_order_type;
           pod.buy = current_action == "BUY";
           pod.quantity = (float)quantity;
@@ -655,7 +655,7 @@ void FreshOrderWindowUI()
         {
           gGlobalData.mPendingPostOrders.push_back({});
           auto& pod = gGlobalData.mPendingPostOrders.back();
-          pod.conid = gGlobalData.mOrderWindowConid;
+          pod.conid = gGlobalData.mPlaceOrderConid;
           pod.orderType = current_order_type;
           pod.buy = current_action == "BUY";
           pod.quantity = (float)quantity;
@@ -1003,8 +1003,8 @@ void MainState()
 
         if (ImGui::Button("FreshOrder", ImVec2(-1.f, 20.f)))
         {
-          gGlobalData.mOrderWindowConid = c.conid;
-          gGlobalData.mOrderWindowTicker = ticker_result;
+          gGlobalData.mPlaceOrderConid = c.conid;
+          gGlobalData.mPlaceOrderTicker = ticker_result;
         }
         ImGui::PopID();
       }
