@@ -1127,8 +1127,7 @@ void MainState()
 
           if (s_chartData.find(conid) == s_chartData.end())
           {
-            ImGui::Text("Bid: --  |  Ask: --");
-            ImGui::Text("Last: --");
+            ImGui::Text("Bid: --  |  Ask: --     [Last: --]");
 
             ImGui::TextColored(ImVec4(1, 1, 0, 1), "Loading..");
           }
@@ -1138,14 +1137,12 @@ void MainState()
 
             if (chartData.mSnapshotResult.success)
             {
-              ImGui::Text("Bid: %.2f  |  Ask: %.2f", chartData.mSnapshotResult.bid,
-                          chartData.mSnapshotResult.ask);
-              ImGui::Text("Last: %.2f", chartData.mSnapshotResult.last);
+              ImGui::Text("Bid: %.2f  |  Ask: %.2f    [Last: --]", chartData.mSnapshotResult.bid,
+                          chartData.mSnapshotResult.ask, chartData.mSnapshotResult.last);
             }
             else
             {
-              ImGui::Text("Bid: --  |  Ask: --");
-              ImGui::Text("Last: %.2f", chartData.mSnapshotResult.last);
+              ImGui::Text("Bid: --  |  Ask: --    [Last: %.2f]", chartData.mSnapshotResult.last);
             }
 
             PlotStockChart(chartData.mMarketDataResult.data);
