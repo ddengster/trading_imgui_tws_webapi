@@ -197,7 +197,7 @@ void PortfolioUI()
     ImGui::TableSetupColumn("RPnL");
     ImGui::TableSetupColumn("UnPnL");
     ImGui::TableSetupColumn("UnPnL%");
-    ImGui::TableSetupColumn("Close?");
+    ImGui::TableSetupColumn("Actions");
 
     ImGui::TableHeadersRow();
 
@@ -255,11 +255,52 @@ void PortfolioUI()
       ImGui::TableNextColumn();
 
       ImGui::PushID(i);
-      if (ImGui::Button("Close")) {}
+      if (ImGui::Button("Close 100%")) 
+      {
+        gGlobalData.mPendingPostOrders.push_back({});
+        auto& pod = gGlobalData.mPendingPostOrders.back();
+        pod.conid = p.conid;
+        pod.orderType = "MKT";
+        pod.buy = p.size < 0.0;
+        double qty = p.size;
+        if (qty < 0) qty = -qty;
+        pod.quantity = (float)(qty * 1.0);
+        pod.price = 0.f;
+        pod.coroHandle = create_managed_coroutine(PostOrders, &pod);
+      }
       ImGui::SameLine();
-      if (ImGui::Button("TP")) {}
+      if (ImGui::Button("Close 50%")) 
+      {
+        gGlobalData.mPendingPostOrders.push_back({});
+        auto& pod = gGlobalData.mPendingPostOrders.back();
+        pod.conid = p.conid;
+        pod.orderType = "MKT";
+        pod.buy = p.size < 0.0;
+        double qty = p.size;
+        if (qty < 0) qty = -qty;
+        pod.quantity = (float)(qty * 0.5);
+        pod.price = 0.f;
+        pod.coroHandle = create_managed_coroutine(PostOrders, &pod);
+      }
       ImGui::SameLine();
-      if (ImGui::Button("SL")) {}
+      if (ImGui::Button("Close 33%")) 
+      {
+        gGlobalData.mPendingPostOrders.push_back({});
+        auto& pod = gGlobalData.mPendingPostOrders.back();
+        pod.conid = p.conid;
+        pod.orderType = "MKT";
+        pod.buy = p.size < 0.0;
+        double qty = p.size;
+        if (qty < 0) qty = -qty;
+        pod.quantity = (float)(qty * 0.33);
+        pod.price = 0.f;
+        pod.coroHandle = create_managed_coroutine(PostOrders, &pod);
+      }
+
+      if (ImGui::Button("SL"))
+      {
+
+      }
       ImGui::PopID();
     }
     ImGui::EndTable();
