@@ -32,20 +32,6 @@ struct AccountIdResult
   bool success = false;
 };
 
-struct LedgerResult
-{
-  std::string accountId;
-  SummaryData summary;
-  bool success = false;
-};
-
-struct SummaryResult
-{
-  std::string accountId;
-  SummaryData summary;
-  bool success = false;
-};
-
 struct MarketDataResult
 {
   int conid;

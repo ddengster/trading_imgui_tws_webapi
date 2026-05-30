@@ -17,10 +17,6 @@
 
 #include "coroutine/coroutine_mgt.h"
 
-std::string gFreshOrderTicker;
-int gFreshOrderConid = -1;
-
-
 bool ConnectingState()
 {
   ImGui::Begin("Connecting", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
@@ -69,9 +65,7 @@ void PortfolioUI()
   static int posCoroHandle = -1;
   static float posRefreshTimer = -1.0f;
   static int ledgerCoroHandle = -1;
-  static LedgerResult ledgerResult;
   static int summaryCoroHandle = -1;
-  static SummaryResult summaryResult;
 
   static float ledgerRefreshTimer = -1.0f;
   static float summaryRefreshTimer = -1.0f;
@@ -110,8 +104,8 @@ void PortfolioUI()
   {
     if (ledgerCoroHandle == -1)
     {
-      ledgerResult.accountId = gGlobalData.mAccountId;
-      ledgerCoroHandle = create_managed_coroutine(PollLedger, &ledgerResult);
+      gGlobalData.mLedgerResult.accountId = gGlobalData.mAccountId;
+      ledgerCoroHandle = create_managed_coroutine(PollLedger, &gGlobalData.mLedgerResult);
     }
     else
     {
@@ -129,8 +123,8 @@ void PortfolioUI()
     ledgerRefreshTimer += ImGui::GetIO().DeltaTime;
     if (ledgerRefreshTimer >= 5.0f)
     {
-      ledgerResult.accountId = gGlobalData.mAccountId;
-      ledgerCoroHandle = create_managed_coroutine(PollLedger, &ledgerResult);
+      gGlobalData.mLedgerResult.accountId = gGlobalData.mAccountId;
+      ledgerCoroHandle = create_managed_coroutine(PollLedger, &gGlobalData.mLedgerResult);
       ledgerRefreshTimer = 0.0f;
     }
   }
@@ -139,8 +133,8 @@ void PortfolioUI()
   {
     if (summaryCoroHandle == -1)
     {
-      summaryResult.accountId = gGlobalData.mAccountId;
-      summaryCoroHandle = create_managed_coroutine(PollSummary, &summaryResult);
+      gGlobalData.mSummaryResult.accountId = gGlobalData.mAccountId;
+      summaryCoroHandle = create_managed_coroutine(PollSummary, &gGlobalData.mSummaryResult);
     }
     else
     {
@@ -158,14 +152,14 @@ void PortfolioUI()
     summaryRefreshTimer += ImGui::GetIO().DeltaTime;
     if (summaryRefreshTimer >= 5.0f)
     {
-      summaryResult.accountId = gGlobalData.mAccountId;
-      summaryCoroHandle = create_managed_coroutine(PollSummary, &summaryResult);
+      gGlobalData.mSummaryResult.accountId = gGlobalData.mAccountId;
+      summaryCoroHandle = create_managed_coroutine(PollSummary, &gGlobalData.mSummaryResult);
       summaryRefreshTimer = 0.0f;
     }
   }
 
-  bool ledgerReady = (ledgerCoroHandle == -1 && ledgerResult.success);
-  bool summaryReady = summaryCoroHandle == -1 && summaryResult.success;
+  bool ledgerReady = (ledgerCoroHandle == -1 && gGlobalData.mLedgerResult.success);
+  bool summaryReady = summaryCoroHandle == -1 && gGlobalData.mSummaryResult.success;
 
   if (!summaryAndLedgerDoneOnce)
     summaryAndLedgerDoneOnce = ledgerReady && summaryReady;
@@ -177,9 +171,9 @@ void PortfolioUI()
   if (summaryAndLedgerDoneOnce)
   {
     ImGui::Text("Cash Balance Total SGD: %g  USD: %g  NetLiq(SGD): %g",
-                ledgerResult.summary.cashSGD, ledgerResult.summary.cashUSD,
-                ledgerResult.summary.netLiquidationValSGD);
-    ImGui::Text("Buying Power SGD: %g", summaryResult.summary.buyingPowerSGD);
+                gGlobalData.mLedgerResult.summary.cashSGD, gGlobalData.mLedgerResult.summary.cashUSD,
+                gGlobalData.mLedgerResult.summary.netLiquidationValSGD);
+    ImGui::Text("Buying Power SGD: %g", gGlobalData.mSummaryResult.summary.buyingPowerSGD);
   }
   else
   {
@@ -568,11 +562,11 @@ void OrderWindowUI()
 
 void FreshOrderWindowUI()
 {
-  if (gFreshOrderConid == -1)
+  if (gGlobalData.mOrderWindowConid == -1)
     return;
 
   char n[32] = {};
-  snprintf(n, sizeof(n), "Fresh Order - %s(%d)", gFreshOrderTicker.c_str(), gFreshOrderConid);
+  snprintf(n, sizeof(n), "Fresh Order - %s(%d)", gGlobalData.mOrderWindowTicker.c_str(), gGlobalData.mOrderWindowConid);
 
   static int quantity = 1;
   static float price = 1.f;
@@ -636,7 +630,7 @@ void FreshOrderWindowUI()
         {
           gGlobalData.mPendingPostOrders.push_back({});
           auto& pod = gGlobalData.mPendingPostOrders.back();
-          pod.conid = gFreshOrderConid;
+          pod.conid = gGlobalData.mOrderWindowConid;
           pod.orderType = current_order_type;
           pod.buy = current_action == "BUY";
           pod.quantity = (float)quantity;
@@ -662,7 +656,7 @@ void FreshOrderWindowUI()
         {
           gGlobalData.mPendingPostOrders.push_back({});
           auto& pod = gGlobalData.mPendingPostOrders.back();
-          pod.conid = gFreshOrderConid;
+          pod.conid = gGlobalData.mOrderWindowConid;
           pod.orderType = current_order_type;
           pod.buy = current_action == "BUY";
           pod.quantity = (float)quantity;
@@ -1010,8 +1004,8 @@ void MainState()
 
         if (ImGui::Button("FreshOrder", ImVec2(-1.f, 20.f)))
         {
-          gFreshOrderConid = c.conid;
-          gFreshOrderTicker = ticker_result;
+          gGlobalData.mOrderWindowConid = c.conid;
+          gGlobalData.mOrderWindowTicker = ticker_result;
         }
         ImGui::PopID();
       }

@@ -74,12 +74,32 @@ struct CancelOrderData
   int coroHandle = -1;
 };
 
+struct LedgerResult
+{
+  std::string accountId;
+  SummaryData summary;
+  bool success = false;
+};
+
+struct SummaryResult
+{
+  std::string accountId;
+  SummaryData summary;
+  bool success = false;
+};
+
 struct GlobalData
 {
   int mConnectionState = 0;
   std::string mAccountId;
 
   int mTodaysRisk = 100;
+
+  std::string mOrderWindowTicker;
+  int mOrderWindowConid = -1;
+
+  LedgerResult mLedgerResult;
+  SummaryResult mSummaryResult;
 
   PositionsResult mPositions;
   std::vector<PostOrderData> mPendingPostOrders;
