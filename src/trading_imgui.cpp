@@ -69,7 +69,6 @@ void PortfolioUI()
 
   static float ledgerRefreshTimer = -1.0f;
   static float summaryRefreshTimer = -1.0f;
-  static bool summaryAndLedgerDoneOnce = false;
 
   if (posRefreshTimer < 0.f)
   {
@@ -161,14 +160,14 @@ void PortfolioUI()
   bool ledgerReady = (ledgerCoroHandle == -1 && gGlobalData.mLedgerResult.success);
   bool summaryReady = summaryCoroHandle == -1 && gGlobalData.mSummaryResult.success;
 
-  if (!summaryAndLedgerDoneOnce)
-    summaryAndLedgerDoneOnce = ledgerReady && summaryReady;
+  if (!gGlobalData.mSummaryAndLedgerDoneOnce)
+    gGlobalData.mSummaryAndLedgerDoneOnce = ledgerReady && summaryReady;
 
   ImGui::SetNextWindowSize(ImVec2(800, 400), ImGuiCond_FirstUseEver);
   ImGui::SetNextWindowPos(ImVec2(0, 400), ImGuiCond_FirstUseEver);
   ImGui::Begin(gGlobalData.mAccountId.c_str());
 
-  if (summaryAndLedgerDoneOnce)
+  if (gGlobalData.mSummaryAndLedgerDoneOnce)
   {
     ImGui::Text("Cash Balance Total SGD: %g  USD: %g  NetLiq(SGD): %g",
                 gGlobalData.mLedgerResult.summary.cashSGD, gGlobalData.mLedgerResult.summary.cashUSD,

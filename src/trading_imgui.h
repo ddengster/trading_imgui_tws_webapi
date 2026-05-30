@@ -102,6 +102,7 @@ struct GlobalData
   SummaryResult mSummaryResult;
 
   PositionsResult mPositions;
+  bool mSummaryAndLedgerDoneOnce = false;
   std::vector<PostOrderData> mPendingPostOrders;
   std::unordered_map<int, CancelOrderData> mPendingCancels;
 };
