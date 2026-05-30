@@ -170,7 +170,8 @@ void PortfolioUI()
   if (gGlobalData.mSummaryAndLedgerDoneOnce)
   {
     ImGui::Text("Cash Balance Total SGD: %g  USD: %g  NetLiq(SGD): %g",
-                gGlobalData.mLedgerResult.summary.cashSGD, gGlobalData.mLedgerResult.summary.cashUSD,
+                gGlobalData.mLedgerResult.summary.cashSGD,
+                gGlobalData.mLedgerResult.summary.cashUSD,
                 gGlobalData.mLedgerResult.summary.netLiquidationValSGD);
     ImGui::Text("Buying Power SGD: %g", gGlobalData.mSummaryResult.summary.buyingPowerSGD);
   }
@@ -255,52 +256,49 @@ void PortfolioUI()
       ImGui::TableNextColumn();
 
       ImGui::PushID(i);
-      if (ImGui::Button("Close 100%")) 
+      if (ImGui::Button("Close 100%"))
       {
-        gGlobalData.mPendingPostOrders.push_back({});
-        auto& pod = gGlobalData.mPendingPostOrders.back();
-        pod.conid = p.conid;
-        pod.orderType = "MKT";
-        pod.buy = p.size < 0.0;
+        gGlobalData.mPendingCloseOrders.push_back({});
+        auto& cod = gGlobalData.mPendingCloseOrders.back();
+        cod.conid = p.conid;
+        cod.buy = p.size < 0.0;
+        cod.symbol = p.symbol;
         double qty = p.size;
-        if (qty < 0) qty = -qty;
-        pod.quantity = (float)(qty * 1.0);
-        pod.price = 0.f;
-        pod.coroHandle = create_managed_coroutine(PostOrders, &pod);
+        if (qty < 0)
+          qty = -qty;
+        cod.quantity = qty * 1.0;
+        cod.coroHandle = create_managed_coroutine(PostCloseOrder, &cod);
       }
       ImGui::SameLine();
-      if (ImGui::Button("Close 50%")) 
+      if (ImGui::Button("Close 50%"))
       {
-        gGlobalData.mPendingPostOrders.push_back({});
-        auto& pod = gGlobalData.mPendingPostOrders.back();
-        pod.conid = p.conid;
-        pod.orderType = "MKT";
-        pod.buy = p.size < 0.0;
+        gGlobalData.mPendingCloseOrders.push_back({});
+        auto& cod = gGlobalData.mPendingCloseOrders.back();
+        cod.conid = p.conid;
+        cod.buy = p.size < 0.0;
+        cod.symbol = p.symbol;
         double qty = p.size;
-        if (qty < 0) qty = -qty;
-        pod.quantity = (float)(qty * 0.5);
-        pod.price = 0.f;
-        pod.coroHandle = create_managed_coroutine(PostOrders, &pod);
+        if (qty < 0)
+          qty = -qty;
+        cod.quantity = qty * 0.55;
+        cod.coroHandle = create_managed_coroutine(PostCloseOrder, &cod);
       }
       ImGui::SameLine();
-      if (ImGui::Button("Close 33%")) 
+      if (ImGui::Button("Close 33%"))
       {
-        gGlobalData.mPendingPostOrders.push_back({});
-        auto& pod = gGlobalData.mPendingPostOrders.back();
-        pod.conid = p.conid;
-        pod.orderType = "MKT";
-        pod.buy = p.size < 0.0;
+        gGlobalData.mPendingCloseOrders.push_back({});
+        auto& cod = gGlobalData.mPendingCloseOrders.back();
+        cod.conid = p.conid;
+        cod.buy = p.size < 0.0;
+        cod.symbol = p.symbol;
         double qty = p.size;
-        if (qty < 0) qty = -qty;
-        pod.quantity = (float)(qty * 0.33);
-        pod.price = 0.f;
-        pod.coroHandle = create_managed_coroutine(PostOrders, &pod);
+        if (qty < 0)
+          qty = -qty;
+        cod.quantity = qty * 0.33;
+        cod.coroHandle = create_managed_coroutine(PostCloseOrder, &cod);
       }
 
-      if (ImGui::Button("SL"))
-      {
-
-      }
+      if (ImGui::Button("SL")) {}
       ImGui::PopID();
     }
     ImGui::EndTable();
@@ -606,7 +604,8 @@ void FreshOrderWindowUI()
     return;
 
   char n[32] = {};
-  snprintf(n, sizeof(n), "Fresh Order - %s(%d)", gGlobalData.mPlaceOrderTicker.c_str(), gGlobalData.mPlaceOrderConid);
+  snprintf(n, sizeof(n), "Fresh Order - %s(%d)", gGlobalData.mPlaceOrderTicker.c_str(),
+           gGlobalData.mPlaceOrderConid);
 
   static int quantity = 1;
   static float price = 1.f;
@@ -683,7 +682,7 @@ void FreshOrderWindowUI()
       }
 
       if (ImGui::BeginTabItem("Standard Order"))
-      { 
+      {
         ImGui::NewLine();
 
         ImGui::InputFloat("Price:", &price);
@@ -727,13 +726,47 @@ void FreshOrderWindowUI()
         }
         else if (pod.success)
         {
-          ImGui::TextColored(ImVec4(0, 1, 0, 1), "Order #%d: OK (ID: %s, status: %s)",
-                             idx, pod.order_id.c_str(), pod.order_status.c_str());
+          ImGui::TextColored(ImVec4(0, 1, 0, 1), "Order #%d: OK (ID: %s, status: %s)", idx,
+                             pod.order_id.c_str(), pod.order_status.c_str());
         }
         else if (!pod.order_status.empty())
         {
-          ImGui::TextColored(ImVec4(1, 0, 0, 1), "Order #%d: FAILED - %s",
-                             idx, pod.order_status.c_str());
+          ImGui::TextColored(ImVec4(1, 0, 0, 1), "Order #%d: FAILED - %s", idx,
+                             pod.order_status.c_str());
+        }
+        ImGui::PopID();
+      }
+      ImGui::Unindent();
+    }
+
+    if (!gGlobalData.mPendingCloseOrders.empty())
+    {
+      ImGui::Separator();
+      ImGui::Text("Close Orders:");
+      ImGui::Indent();
+      int idx = 0;
+      for (auto& cod : gGlobalData.mPendingCloseOrders)
+      {
+        ++idx;
+        ImGui::PushID(idx);
+        ImGui::Text("%s ", cod.symbol.c_str());
+        ImGui::SameLine();
+        if (cod.coroHandle != -1)
+        {
+          ImGui::TextColored(ImVec4(1, 1, 0, 1), "fetching snapshot...");
+        }
+        else if (cod.success)
+        {
+          ImGui::TextColored(ImVec4(0, 1, 0, 1), "OK (ID: %s, status: %s)", cod.order_id.c_str(),
+                             cod.order_status.c_str());
+        }
+        else if (!cod.order_status.empty())
+        {
+          ImGui::TextColored(ImVec4(1, 0, 0, 1), "FAILED - %s", cod.order_status.c_str());
+        }
+        else
+        {
+          ImGui::TextColored(ImVec4(1, 0, 0, 1), "FAILED");
         }
         ImGui::PopID();
       }
@@ -743,7 +776,8 @@ void FreshOrderWindowUI()
   ImGui::End();
 
   // process pending orders - check for completion
-  for (auto it = gGlobalData.mPendingPostOrders.begin(); it != gGlobalData.mPendingPostOrders.end(); )
+  for (auto it = gGlobalData.mPendingPostOrders.begin();
+       it != gGlobalData.mPendingPostOrders.end();)
   {
     auto& pod = *it;
     if (pod.coroHandle != -1)
@@ -922,9 +956,11 @@ void MainState()
     struct tm* now_tm = localtime(&now);
     const char* time_text = "\t\t\t\t\t\t\t%s\t\t\tAccountId:%s";
     if (now_tm->tm_sec >= 45)
-      ImGui::TextColored(ImVec4(0, 1, 0, 1), time_text, asctime(now_tm), gGlobalData.mAccountId.c_str());
+      ImGui::TextColored(ImVec4(0, 1, 0, 1), time_text, asctime(now_tm),
+                         gGlobalData.mAccountId.c_str());
     else
-      ImGui::TextColored(ImVec4(1, 0, 0, 1), time_text, asctime(now_tm), gGlobalData.mAccountId.c_str());
+      ImGui::TextColored(ImVec4(1, 0, 0, 1), time_text, asctime(now_tm),
+                         gGlobalData.mAccountId.c_str());
 
     ImGui::EndMainMenuBar();
   }

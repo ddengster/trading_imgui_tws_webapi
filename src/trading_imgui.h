@@ -74,6 +74,21 @@ struct CancelOrderData
   int coroHandle = -1;
 };
 
+struct CloseOrderData
+{
+  int conid;
+  double quantity;
+  bool buy;
+  std::string symbol;
+
+  std::string order_id;
+  std::string order_status;
+  std::string encrypt_message;
+
+  bool success = false;
+  int coroHandle = -1;
+};
+
 struct LedgerResult
 {
   std::string accountId;
@@ -104,6 +119,7 @@ struct GlobalData
   PositionsResult mPositions;
   bool mSummaryAndLedgerDoneOnce = false;
   std::vector<PostOrderData> mPendingPostOrders;
+  std::vector<CloseOrderData> mPendingCloseOrders;
   std::unordered_map<int, CancelOrderData> mPendingCancels;
 };
 extern GlobalData gGlobalData;
