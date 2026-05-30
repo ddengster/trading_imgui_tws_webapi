@@ -32,27 +32,6 @@ struct AccountIdResult
   bool success = false;
 };
 
-struct PositionsResult
-{
-  std::string accountId;
-  std::vector<PositionData> positions;
-  bool success = false;
-};
-
-struct LedgerResult
-{
-  std::string accountId;
-  SummaryData summary;
-  bool success = false;
-};
-
-struct SummaryResult
-{
-  std::string accountId;
-  SummaryData summary;
-  bool success = false;
-};
-
 struct MarketDataResult
 {
   int conid;
@@ -94,32 +73,6 @@ struct OrdersResult
 {
   std::vector<OrderData> orders;
   bool success = false;
-};
-
-struct PostOrderData
-{
-  int conid;
-  std::string orderType;
-  float price = 1.f; // LMT or STOP_LIMIT
-  float aux_price = 0.f; // for STOP_LIMIT and traillmt orders
-  bool buy = true;
-  // float trailing_amount; //  TRAIL and TRAILLMT order
-  // std::string trailingType;
-  float quantity;
-
-  // response fields
-  std::string order_id;
-  std::string order_status;
-  std::string encrypt_message;
-
-  bool success = false;
-};
-
-struct CancelOrderData
-{
-  int orderId;
-  bool success = false;
-  int coroHandle = -1;
 };
 
 struct SuppressQuestionsData

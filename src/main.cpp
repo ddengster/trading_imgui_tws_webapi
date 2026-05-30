@@ -19,8 +19,7 @@
 
 #include "implot/implot.h"
 
-// Trading Data
-int gConnectionState = 0; // 
+GlobalData gGlobalData;
 
 // Data
 static ID3D11Device*            g_pd3dDevice = nullptr;
@@ -147,12 +146,12 @@ int main(int, char**)
 
         process_coroutines();
 
-        if (gConnectionState == 0)
+        if (gGlobalData.mConnectionState == 0)
         {
           bool connected = ConnectingState();
           if (connected)
           {
-            gConnectionState = 1;
+            gGlobalData.mConnectionState = 1;
             create_managed_coroutine(PostSuppressQuestions, nullptr);
           }
         }

@@ -12,8 +12,6 @@
 
 #define BASE_URL "https://localhost:5000/v1/api"
 
-extern std::string gAccountId;
-extern std::unordered_map<int, CancelOrderData> gPendingCancels;
 
 struct ReqRes
 {
@@ -153,6 +151,7 @@ void PollPositions(mco_coro* co)
     {
       JSON_Object* obj = json_array_get_object(arr, i);
       const char* contractDesc = json_object_get_string(obj, "contractDesc");
+      int conid = json_object_get_number(obj, "conid");
       double position = json_object_get_number(obj, "position");
       double avgCost = json_object_get_number(obj, "avgCost");
       double mktPrice = json_object_get_number(obj, "mktPrice");
@@ -173,6 +172,7 @@ void PollPositions(mco_coro* co)
       pd.symbol = symbol;
       pd.secType = contractDesc;
       pd.assetClass = assetclass;
+      pd.conid = conid;
       pd.size = position;
       pd.averageCost = avgCost;
       pd.marketPrice = mktPrice;
@@ -548,7 +548,7 @@ void PostOrders(mco_coro* co)
     {
       JSON_Value* order = json_value_init_object();
       auto order_obj = json_value_get_object(order);
-      json_object_set_string(order_obj, "acctId", gAccountId.c_str());
+      json_object_set_string(order_obj, "acctId", gGlobalData.mAccountId.c_str());
       json_object_set_number(order_obj, "conid", data->conid);
 
       {
@@ -600,7 +600,7 @@ void PostOrders(mco_coro* co)
 
 
   char url[512] = {};
-  snprintf(url, sizeof(url), BASE_URL "/iserver/account/%s/orders", gAccountId.c_str());
+  snprintf(url, sizeof(url), BASE_URL "/iserver/account/%s/orders", gGlobalData.mAccountId.c_str());
   rr.req = naettRequestWithOptions(url, 3, (const naettOption**)&options);
   rr.res = naettMake(rr.req);
 
@@ -686,10 +686,10 @@ void CancelOrder(mco_coro* co)
 {
   int orderId = (int)mco_get_user_data(co);
   
-  CancelOrderData& pc = gPendingCancels[orderId];
+  CancelOrderData& pc = gGlobalData.mPendingCancels[orderId];
 
   char url[512] = {};
-  snprintf(url, sizeof(url), BASE_URL "/iserver/account/%s/order/%d", gAccountId.c_str(), orderId);
+  snprintf(url, sizeof(url), BASE_URL "/iserver/account/%s/order/%d", gGlobalData.mAccountId.c_str(), orderId);
 
   ReqRes rr;
   naettOption* options[] = {naettMethod("DELETE")};
