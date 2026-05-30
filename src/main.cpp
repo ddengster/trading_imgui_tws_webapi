@@ -14,6 +14,7 @@
 #include "naett/naett.h"
 #include "trading_imgui.h"
 #include "im_api.h"
+#include "parson/parson.h"
 
 #include "coroutine/coroutine_mgt.h"
 
@@ -101,6 +102,7 @@ int main(int, char**)
     //IM_ASSERT(font != nullptr);
 
     naettInit(nullptr);
+    json_set_float_serialization_format("%.2f");
 
     bool show_demo_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);

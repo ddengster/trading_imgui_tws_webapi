@@ -39,19 +39,6 @@ struct MarketDataResult
   bool success = false;
 };
 
-struct SnapshotResult
-{
-  // args
-  int conid;
-
-
-  // result
-  double last = 0.0;
-  double bid = 0.0;
-  double ask = 0.0;
-  bool success = false;
-};
-
 struct StockChartData
 {
   MarketDataResult mMarketDataResult;

@@ -614,6 +614,23 @@ void FreshOrderWindowUI()
   ImGui::SetNextWindowPos(ImVec2(800, 400), ImGuiCond_FirstUseEver);
   if (ImGui::Begin(n))
   {
+    float bid = 0.f, ask = 0.f, last = 0.f;
+    int conid = gGlobalData.mPlaceOrderConid;
+    if (gGlobalData.mSnapshotBidAskLast.count(conid) &&
+        gGlobalData.mSnapshotBidAskLast[conid].timestamp != 0)
+    {
+      auto& price = gGlobalData.mSnapshotBidAskLast[conid];
+      bid = price.bid;
+      ask = price.ask;
+      last = price.last;
+      ImGui::Text("Bid: %.2f  |  Ask: %.2f  |  Last: %.2f", price.bid, price.ask, price.last);
+    }
+    else
+    {
+      ImGui::TextColored(ImVec4(1, 1, 0, 1), "Loading snapshot...");
+    }
+    ImGui::Separator();
+
     const char* possible_actions[] = {"BUY", "SELL"};
     static const char* current_action = possible_actions[0];
 
@@ -645,15 +662,34 @@ void FreshOrderWindowUI()
       ImGui::EndCombo();
     }
 
+    auto round2decimals = [](float x)
+    {
+      return std::round(x * 100.0) / 100.0;
+    };
+
     if (ImGui::BeginTabBar("##tabs"))
     {
       if (ImGui::BeginTabItem("Risk-based Order"))
       {
+        ImGui::Text("Set price to : ");
+        ImGui::SameLine();
+        if (ImGui::Button("Bid"))
+          price = round2decimals(bid);
+        ImGui::SameLine();
+        if (ImGui::Button("Mid"))
+          price = round2decimals((bid + ask) * 0.5f);
+        ImGui::SameLine();
+        if (ImGui::Button("Ask"))
+          price = round2decimals(ask);
+        ImGui::SameLine();
+        if (ImGui::Button("Last"))
+          price = round2decimals(last);
+
         ImGui::NewLine();
 
         ImGui::InputFloat("Price:", &price);
 
-        float risk = 100.0f;
+        static float risk = gGlobalData.mTodaysRisk;
         ImGui::Text("Risk: $%.2f", risk);
 
         static float lod_offset = 1.f;
@@ -683,6 +719,20 @@ void FreshOrderWindowUI()
 
       if (ImGui::BeginTabItem("Standard Order"))
       {
+        ImGui::Text("Set price to : ");
+        ImGui::SameLine();
+        if (ImGui::Button("Bid"))
+          price = round2decimals(bid);
+        ImGui::SameLine();
+        if (ImGui::Button("Mid"))
+          price = round2decimals((bid + ask) * 0.5f);
+        ImGui::SameLine();
+        if (ImGui::Button("Ask"))
+          price = round2decimals(ask);
+        ImGui::SameLine();
+        if (ImGui::Button("Last"))
+          price = round2decimals(last);
+
         ImGui::NewLine();
 
         ImGui::InputFloat("Price:", &price);
@@ -774,6 +824,39 @@ void FreshOrderWindowUI()
     }
   }
   ImGui::End();
+
+  // snapshot polling for fresh order window, repeats every 5s
+  {
+    int conid = gGlobalData.mPlaceOrderConid;
+
+    if (conid != gGlobalData.mFreshOrderSnapshotResult.conid &&
+        gGlobalData.mFreshOrderSnapshotCoroHandle != -1)
+    {
+      destroy_coroutine(gGlobalData.mFreshOrderSnapshotCoroHandle);
+      gGlobalData.mFreshOrderSnapshotCoroHandle = -1;
+    }
+    if (gGlobalData.mFreshOrderSnapshotCoroHandle != -1)
+    {
+      mco_coro* co = get_coroutine(gGlobalData.mFreshOrderSnapshotCoroHandle);
+      if (!co || mco_status(co) == MCO_DEAD)
+      {
+        destroy_coroutine(gGlobalData.mFreshOrderSnapshotCoroHandle);
+        gGlobalData.mFreshOrderSnapshotCoroHandle = -1;
+      }
+    }
+
+    time_t now = time(NULL);
+    bool stale = !gGlobalData.mSnapshotBidAskLast.count(conid) ||
+                 gGlobalData.mSnapshotBidAskLast[conid].timestamp == 0 ||
+                 now - gGlobalData.mSnapshotBidAskLast[conid].timestamp >= 5;
+    if (stale && gGlobalData.mFreshOrderSnapshotCoroHandle == -1)
+    {
+      printf("Starting snapshot coro for conid %d\n", conid);
+      gGlobalData.mFreshOrderSnapshotResult.conid = conid;
+      gGlobalData.mFreshOrderSnapshotCoroHandle =
+        create_managed_coroutine(PollMarketDataSnapshot, &gGlobalData.mFreshOrderSnapshotResult);
+    }
+  }
 
   // process pending orders - check for completion
   for (auto it = gGlobalData.mPendingPostOrders.begin();
@@ -1137,12 +1220,14 @@ void MainState()
 
             if (chartData.mSnapshotResult.success)
             {
-              ImGui::Text("Bid: %.2f  |  Ask: %.2f    [Last: --]", chartData.mSnapshotResult.bid,
-                          chartData.mSnapshotResult.ask, chartData.mSnapshotResult.last);
+              const auto& price = gGlobalData.mSnapshotBidAskLast[conid];
+              ImGui::Text("Bid: %.2f  |  Ask: %.2f    [Last: --]", price.bid, price.ask,
+                          price.last);
             }
             else
             {
-              ImGui::Text("Bid: --  |  Ask: --    [Last: %.2f]", chartData.mSnapshotResult.last);
+              const auto& price = gGlobalData.mSnapshotBidAskLast[conid];
+              ImGui::Text("Bid: --  |  Ask: --    [Last: %.2f]", price.last);
             }
 
             PlotStockChart(chartData.mMarketDataResult.data);

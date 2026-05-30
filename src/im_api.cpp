@@ -1,5 +1,6 @@
 
 #include "im_api.h"
+#include "trading_imgui.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -378,12 +379,14 @@ void PollMarketDataSnapshot(mco_coro* co)
     if (arr && json_array_get_count(arr) > 0)
     {
       JSON_Object* obj = json_array_get_object(arr, 0);
+      SnapshotPriceData& price = gGlobalData.mSnapshotBidAskLast[result->conid];
       const char* last_str = json_object_get_string(obj, "31");
-      result->last = last_str ? atof(last_str) : 0.0;
+      price.last = last_str ? atof(last_str) : 0.0;
       const char* bid_str = json_object_get_string(obj, "84");
-      result->bid = bid_str ? atof(bid_str) : 0.0;
+      price.bid = bid_str ? atof(bid_str) : 0.0;
       const char* ask_str = json_object_get_string(obj, "86");
-      result->ask = ask_str ? atof(ask_str) : 0.0;
+      price.ask = ask_str ? atof(ask_str) : 0.0;
+      price.timestamp = time(NULL);
       result->success = true;
     }
 

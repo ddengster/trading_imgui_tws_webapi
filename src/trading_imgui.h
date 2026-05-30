@@ -96,6 +96,20 @@ struct LedgerResult
   bool success = false;
 };
 
+struct SnapshotResult
+{
+  int conid;
+  bool success = false;
+};
+
+struct SnapshotPriceData
+{
+  double last = 0.0;
+  double bid = 0.0;
+  double ask = 0.0;
+  time_t timestamp = 0;
+};
+
 struct SummaryResult
 {
   std::string accountId;
@@ -117,6 +131,10 @@ struct GlobalData
   SummaryResult mSummaryResult;
 
   PositionsResult mPositions;
+  std::unordered_map<int, SnapshotPriceData> mSnapshotBidAskLast;
+  
+  SnapshotResult mFreshOrderSnapshotResult;
+  int mFreshOrderSnapshotCoroHandle = -1;
   bool mSummaryAndLedgerDoneOnce = false;
   std::vector<PostOrderData> mPendingPostOrders;
   std::vector<CloseOrderData> mPendingCloseOrders;
