@@ -1,5 +1,6 @@
 
 #include "im_api.h"
+#include "trading_imgui.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -378,12 +379,14 @@ void PollMarketDataSnapshot(mco_coro* co)
     if (arr && json_array_get_count(arr) > 0)
     {
       JSON_Object* obj = json_array_get_object(arr, 0);
+      SnapshotPriceData& price = gGlobalData.mSnapshotBidAskLast[result->conid];
       const char* last_str = json_object_get_string(obj, "31");
-      result->last = last_str ? atof(last_str) : 0.0;
+      price.last = last_str ? atof(last_str) : 0.0;
       const char* bid_str = json_object_get_string(obj, "84");
-      result->bid = bid_str ? atof(bid_str) : 0.0;
+      price.bid = bid_str ? atof(bid_str) : 0.0;
       const char* ask_str = json_object_get_string(obj, "86");
-      result->ask = ask_str ? atof(ask_str) : 0.0;
+      price.ask = ask_str ? atof(ask_str) : 0.0;
+      price.timestamp = time(NULL);
       result->success = true;
     }
 
@@ -428,6 +431,8 @@ void PollConId(mco_coro* co)
     JSON_Array* arr = json_object_get_array(obj, result->symbol.c_str());
     int count = (int)json_array_get_count(arr);
     result->contracts.clear();
+    printf("reply: %s\n", (const char*)body);
+
     if (arr && count > 0)
     {
       for (int i = 0; i < count; ++i)
@@ -556,7 +561,7 @@ void PostOrders(mco_coro* co)
         snprintf(buf, sizeof(buf), "%ld@SMART", data->conid);
         json_object_set_string(order_obj, "conidex", buf);
 
-        snprintf(buf, sizeof(buf), "%ld:STK", data->conid);
+        snprintf(buf, sizeof(buf), "%ld@STK", data->conid);
         json_object_set_string(order_obj, "secType", buf);
       }
 
@@ -680,6 +685,195 @@ void PostOrders(mco_coro* co)
   }
 
   rr.cleanup();
+}
+
+void PostCloseOrder(mco_coro* co)
+{
+  auto* data = static_cast<CloseOrderData*>(mco_get_user_data(co));
+
+  // Step 1: Fetch snapshot bid/ask/last
+  time_t now = time(NULL);
+  now -= 3600;
+  struct tm* tmt = localtime(&now);
+  time_t epoch = mktime(tmt);
+
+  char snap_url[512];
+  snprintf(snap_url, sizeof(snap_url),
+           BASE_URL "/iserver/marketdata/snapshot?conids=%d&since=%lld&fields=31,84,86",
+           data->conid, epoch);
+
+  ReqRes rr = make_get(snap_url);
+  if (!rr.valid())
+  {
+    data->success = false;
+    return;
+  }
+
+  yield();
+  yield_until_true([](void* ud) { return naettComplete((naettRes*)ud) != 0; }, rr.res);
+
+  double bid = 0.0, ask = 0.0, last = 0.0;
+  int snap_status = naettGetStatus(rr.res);
+  if (snap_status == 200)
+  {
+    int sz = 0;
+    const void* body = naettGetBody(rr.res, &sz);
+    printf("%s\n", (const char*)body);
+
+    JSON_Value* val = json_parse_string((const char*)body);
+    JSON_Array* arr = json_value_get_array(val);
+    if (arr && json_array_get_count(arr) > 0)
+    {
+      JSON_Object* obj = json_array_get_object(arr, 0);
+      const char* last_str = json_object_get_string(obj, "31");
+      last = last_str ? atof(last_str) : 0.0;
+      const char* bid_str = json_object_get_string(obj, "84");
+      bid = bid_str ? atof(bid_str) : 0.0;
+      const char* ask_str = json_object_get_string(obj, "86");
+      ask = ask_str ? atof(ask_str) : 0.0;
+    }
+    json_value_free(val);
+  }
+  rr.cleanup();
+
+  double limitPrice = data->buy ? (ask > 0.0 ? ask : last) : (bid > 0.0 ? bid : last);
+  if (limitPrice <= 0.0)
+  {
+    data->success = false;
+    return;
+  }
+  // limitPrice += 100.0; //for testing only
+
+
+  // Step 2: Place limit order
+  char json_buf[1024] = {};
+  {
+    JSON_Value* base = json_value_init_object();
+    auto base_obj = json_value_get_object(base);
+    auto arry = json_value_init_array();
+
+    {
+      JSON_Value* order = json_value_init_object();
+      auto order_obj = json_value_get_object(order);
+      json_object_set_string(order_obj, "acctId", gGlobalData.mAccountId.c_str());
+      json_object_set_number(order_obj, "conid", data->conid);
+
+      {
+        char buf[64] = {};
+        snprintf(buf, sizeof(buf), "%ld@SMART", data->conid);
+        json_object_set_string(order_obj, "conidex", buf);
+        snprintf(buf, sizeof(buf), "%ld:STK", data->conid);
+        json_object_set_string(order_obj, "secType", buf);
+      }
+
+      json_object_set_null(order_obj, "parentId");
+      json_object_set_string(order_obj, "orderType", "LMT");
+      json_object_set_string(order_obj, "listingExchange", "NASDAQ");
+      json_object_set_boolean(order_obj, "isSingleGroup", true);
+      json_object_set_boolean(order_obj, "outsideRTH", true);
+      json_object_set_number(order_obj, "price", limitPrice);
+      json_object_set_string(order_obj, "side", data->buy ? "BUY" : "SELL");
+      json_object_set_string(order_obj, "ticker", data->symbol.c_str());
+      json_object_set_string(order_obj, "tif", "GTC");
+      json_object_set_number(order_obj, "quantity", (int)data->quantity);
+      json_object_set_boolean(order_obj, "allOrNone", false);
+      json_object_set_string(order_obj, "referrer", "QuickTrade");
+
+      json_array_append_value(json_value_get_array(arry), order);
+    }
+    json_object_set_value(base_obj, "orders", arry);
+
+    JSON_Status ret = json_serialize_to_buffer(base, json_buf, sizeof(json_buf));
+    if (ret != JSONSuccess)
+    {
+      json_value_free(base);
+      data->success = false;
+      return;
+    }
+  }
+  printf("%s\n", json_buf);
+
+  ReqRes rr2;
+  naettOption* options[] = {naettMethod("POST"), naettHeader("Content-Type", "application/json"),
+                            naettBody(json_buf, strlen(json_buf))};
+
+  char url[512] = {};
+  snprintf(url, sizeof(url), BASE_URL "/iserver/account/%s/orders", gGlobalData.mAccountId.c_str());
+  rr2.req = naettRequestWithOptions(url, 3, (const naettOption**)&options);
+  rr2.res = naettMake(rr2.req);
+
+  if (!rr2.valid())
+  {
+    data->success = false;
+    return;
+  }
+
+  yield();
+  yield_until_true([](void* ud) { return naettComplete((naettRes*)ud) != 0; }, rr2.res);
+
+  int status = naettGetStatus(rr2.res);
+  if (status == 200)
+  {
+    int sz = 0;
+    const void* body = naettGetBody(rr2.res, &sz);
+    printf("%s\n", (const char*)body);
+
+    JSON_Value* val = json_parse_string((const char*)body);
+    JSON_Array* arr = json_value_get_array(val);
+    if (arr && json_array_get_count(arr) > 0)
+    {
+      JSON_Object* obj = json_array_get_object(arr, 0);
+      if (obj)
+      {
+        const char* oid = json_object_get_string(obj, "order_id");
+        if (oid && strlen(oid) > 0)
+        {
+          data->order_id = oid;
+          const char* ost = json_object_get_string(obj, "order_status");
+          if (ost) data->order_status = ost;
+          const char* emsg = json_object_get_string(obj, "encrypt_message");
+          if (emsg) data->encrypt_message = emsg;
+          data->success = true;
+        }
+        else
+        {
+          JSON_Array* msg_arr = json_object_get_array(obj, "message");
+          if (msg_arr && json_array_get_count(msg_arr) > 0)
+          {
+            const char* err = json_array_get_string(msg_arr, 0);
+            if (err) data->order_status = err;
+          }
+          if (data->order_status.empty())
+          {
+            const char* msg = json_object_get_string(obj, "message");
+            if (msg) data->order_status = msg;
+          }
+          data->success = false;
+        }
+      }
+    }
+    else
+    {
+      JSON_Object* obj = json_value_get_object(val);
+      if (obj)
+      {
+        const char* err = json_object_get_string(obj, "error");
+        if (err) data->order_status = err;
+        data->success = false;
+      }
+    }
+    json_value_free(val);
+  }
+  else
+  {
+    int sz = 0;
+    const void* body = naettGetBody(rr2.res, &sz);
+    printf("Error placing order: HTTP %d\n", status);
+    printf("%s\n", (const char*)body);
+    data->success = false;
+  }
+
+  rr2.cleanup();
 }
 
 void CancelOrder(mco_coro* co)

@@ -39,19 +39,6 @@ struct MarketDataResult
   bool success = false;
 };
 
-struct SnapshotResult
-{
-  // args
-  int conid;
-
-
-  // result
-  double last = 0.0;
-  double bid = 0.0;
-  double ask = 0.0;
-  bool success = false;
-};
-
 struct StockChartData
 {
   MarketDataResult mMarketDataResult;
@@ -92,5 +79,6 @@ void PollMarketDataSnapshot(mco_coro* co);
 void PollConId(mco_coro* co);
 void PollOrders(mco_coro* co);
 void PostOrders(mco_coro* co);
+void PostCloseOrder(mco_coro* co);
 void CancelOrder(mco_coro* co);
 void PostSuppressQuestions(mco_coro* co);

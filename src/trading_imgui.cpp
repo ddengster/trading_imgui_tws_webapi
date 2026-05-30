@@ -170,7 +170,8 @@ void PortfolioUI()
   if (gGlobalData.mSummaryAndLedgerDoneOnce)
   {
     ImGui::Text("Cash Balance Total SGD: %g  USD: %g  NetLiq(SGD): %g",
-                gGlobalData.mLedgerResult.summary.cashSGD, gGlobalData.mLedgerResult.summary.cashUSD,
+                gGlobalData.mLedgerResult.summary.cashSGD,
+                gGlobalData.mLedgerResult.summary.cashUSD,
                 gGlobalData.mLedgerResult.summary.netLiquidationValSGD);
     ImGui::Text("Buying Power SGD: %g", gGlobalData.mSummaryResult.summary.buyingPowerSGD);
   }
@@ -197,7 +198,7 @@ void PortfolioUI()
     ImGui::TableSetupColumn("RPnL");
     ImGui::TableSetupColumn("UnPnL");
     ImGui::TableSetupColumn("UnPnL%");
-    ImGui::TableSetupColumn("Close?");
+    ImGui::TableSetupColumn("Actions");
 
     ImGui::TableHeadersRow();
 
@@ -255,10 +256,48 @@ void PortfolioUI()
       ImGui::TableNextColumn();
 
       ImGui::PushID(i);
-      if (ImGui::Button("Close")) {}
+      if (ImGui::Button("Close 100%"))
+      {
+        gGlobalData.mPendingCloseOrders.push_back({});
+        auto& cod = gGlobalData.mPendingCloseOrders.back();
+        cod.conid = p.conid;
+        cod.buy = p.size < 0.0;
+        cod.symbol = p.symbol;
+        double qty = p.size;
+        if (qty < 0)
+          qty = -qty;
+        cod.quantity = qty * 1.0;
+        cod.coroHandle = create_managed_coroutine(PostCloseOrder, &cod);
+      }
       ImGui::SameLine();
-      if (ImGui::Button("TP")) {}
+      if (ImGui::Button("Close 50%"))
+      {
+        gGlobalData.mPendingCloseOrders.push_back({});
+        auto& cod = gGlobalData.mPendingCloseOrders.back();
+        cod.conid = p.conid;
+        cod.buy = p.size < 0.0;
+        cod.symbol = p.symbol;
+        double qty = p.size;
+        if (qty < 0)
+          qty = -qty;
+        cod.quantity = qty * 0.55;
+        cod.coroHandle = create_managed_coroutine(PostCloseOrder, &cod);
+      }
       ImGui::SameLine();
+      if (ImGui::Button("Close 33%"))
+      {
+        gGlobalData.mPendingCloseOrders.push_back({});
+        auto& cod = gGlobalData.mPendingCloseOrders.back();
+        cod.conid = p.conid;
+        cod.buy = p.size < 0.0;
+        cod.symbol = p.symbol;
+        double qty = p.size;
+        if (qty < 0)
+          qty = -qty;
+        cod.quantity = qty * 0.33;
+        cod.coroHandle = create_managed_coroutine(PostCloseOrder, &cod);
+      }
+
       if (ImGui::Button("SL")) {}
       ImGui::PopID();
     }
@@ -565,7 +604,8 @@ void FreshOrderWindowUI()
     return;
 
   char n[32] = {};
-  snprintf(n, sizeof(n), "Fresh Order - %s(%d)", gGlobalData.mPlaceOrderTicker.c_str(), gGlobalData.mPlaceOrderConid);
+  snprintf(n, sizeof(n), "Fresh Order - %s(%d)", gGlobalData.mPlaceOrderTicker.c_str(),
+           gGlobalData.mPlaceOrderConid);
 
   static int quantity = 1;
   static float price = 1.f;
@@ -574,6 +614,23 @@ void FreshOrderWindowUI()
   ImGui::SetNextWindowPos(ImVec2(800, 400), ImGuiCond_FirstUseEver);
   if (ImGui::Begin(n))
   {
+    float bid = 0.f, ask = 0.f, last = 0.f;
+    int conid = gGlobalData.mPlaceOrderConid;
+    if (gGlobalData.mSnapshotBidAskLast.count(conid) &&
+        gGlobalData.mSnapshotBidAskLast[conid].timestamp != 0)
+    {
+      auto& price = gGlobalData.mSnapshotBidAskLast[conid];
+      bid = price.bid;
+      ask = price.ask;
+      last = price.last;
+      ImGui::Text("Bid: %.2f  |  Ask: %.2f  |  Last: %.2f", price.bid, price.ask, price.last);
+    }
+    else
+    {
+      ImGui::TextColored(ImVec4(1, 1, 0, 1), "Loading snapshot...");
+    }
+    ImGui::Separator();
+
     const char* possible_actions[] = {"BUY", "SELL"};
     static const char* current_action = possible_actions[0];
 
@@ -605,15 +662,34 @@ void FreshOrderWindowUI()
       ImGui::EndCombo();
     }
 
+    auto round2decimals = [](float x)
+    {
+      return std::round(x * 100.0) / 100.0;
+    };
+
     if (ImGui::BeginTabBar("##tabs"))
     {
       if (ImGui::BeginTabItem("Risk-based Order"))
       {
+        ImGui::Text("Set price to : ");
+        ImGui::SameLine();
+        if (ImGui::Button("Bid"))
+          price = round2decimals(bid);
+        ImGui::SameLine();
+        if (ImGui::Button("Mid"))
+          price = round2decimals((bid + ask) * 0.5f);
+        ImGui::SameLine();
+        if (ImGui::Button("Ask"))
+          price = round2decimals(ask);
+        ImGui::SameLine();
+        if (ImGui::Button("Last"))
+          price = round2decimals(last);
+
         ImGui::NewLine();
 
         ImGui::InputFloat("Price:", &price);
 
-        float risk = 100.0f;
+        static float risk = gGlobalData.mTodaysRisk;
         ImGui::Text("Risk: $%.2f", risk);
 
         static float lod_offset = 1.f;
@@ -642,7 +718,21 @@ void FreshOrderWindowUI()
       }
 
       if (ImGui::BeginTabItem("Standard Order"))
-      { 
+      {
+        ImGui::Text("Set price to : ");
+        ImGui::SameLine();
+        if (ImGui::Button("Bid"))
+          price = round2decimals(bid);
+        ImGui::SameLine();
+        if (ImGui::Button("Mid"))
+          price = round2decimals((bid + ask) * 0.5f);
+        ImGui::SameLine();
+        if (ImGui::Button("Ask"))
+          price = round2decimals(ask);
+        ImGui::SameLine();
+        if (ImGui::Button("Last"))
+          price = round2decimals(last);
+
         ImGui::NewLine();
 
         ImGui::InputFloat("Price:", &price);
@@ -686,13 +776,47 @@ void FreshOrderWindowUI()
         }
         else if (pod.success)
         {
-          ImGui::TextColored(ImVec4(0, 1, 0, 1), "Order #%d: OK (ID: %s, status: %s)",
-                             idx, pod.order_id.c_str(), pod.order_status.c_str());
+          ImGui::TextColored(ImVec4(0, 1, 0, 1), "Order #%d: OK (ID: %s, status: %s)", idx,
+                             pod.order_id.c_str(), pod.order_status.c_str());
         }
         else if (!pod.order_status.empty())
         {
-          ImGui::TextColored(ImVec4(1, 0, 0, 1), "Order #%d: FAILED - %s",
-                             idx, pod.order_status.c_str());
+          ImGui::TextColored(ImVec4(1, 0, 0, 1), "Order #%d: FAILED - %s", idx,
+                             pod.order_status.c_str());
+        }
+        ImGui::PopID();
+      }
+      ImGui::Unindent();
+    }
+
+    if (!gGlobalData.mPendingCloseOrders.empty())
+    {
+      ImGui::Separator();
+      ImGui::Text("Close Orders:");
+      ImGui::Indent();
+      int idx = 0;
+      for (auto& cod : gGlobalData.mPendingCloseOrders)
+      {
+        ++idx;
+        ImGui::PushID(idx);
+        ImGui::Text("%s ", cod.symbol.c_str());
+        ImGui::SameLine();
+        if (cod.coroHandle != -1)
+        {
+          ImGui::TextColored(ImVec4(1, 1, 0, 1), "fetching snapshot...");
+        }
+        else if (cod.success)
+        {
+          ImGui::TextColored(ImVec4(0, 1, 0, 1), "OK (ID: %s, status: %s)", cod.order_id.c_str(),
+                             cod.order_status.c_str());
+        }
+        else if (!cod.order_status.empty())
+        {
+          ImGui::TextColored(ImVec4(1, 0, 0, 1), "FAILED - %s", cod.order_status.c_str());
+        }
+        else
+        {
+          ImGui::TextColored(ImVec4(1, 0, 0, 1), "FAILED");
         }
         ImGui::PopID();
       }
@@ -701,8 +825,42 @@ void FreshOrderWindowUI()
   }
   ImGui::End();
 
+  // snapshot polling for fresh order window, repeats every 5s
+  {
+    int conid = gGlobalData.mPlaceOrderConid;
+
+    if (conid != gGlobalData.mFreshOrderSnapshotResult.conid &&
+        gGlobalData.mFreshOrderSnapshotCoroHandle != -1)
+    {
+      destroy_coroutine(gGlobalData.mFreshOrderSnapshotCoroHandle);
+      gGlobalData.mFreshOrderSnapshotCoroHandle = -1;
+    }
+    if (gGlobalData.mFreshOrderSnapshotCoroHandle != -1)
+    {
+      mco_coro* co = get_coroutine(gGlobalData.mFreshOrderSnapshotCoroHandle);
+      if (!co || mco_status(co) == MCO_DEAD)
+      {
+        destroy_coroutine(gGlobalData.mFreshOrderSnapshotCoroHandle);
+        gGlobalData.mFreshOrderSnapshotCoroHandle = -1;
+      }
+    }
+
+    time_t now = time(NULL);
+    bool stale = !gGlobalData.mSnapshotBidAskLast.count(conid) ||
+                 gGlobalData.mSnapshotBidAskLast[conid].timestamp == 0 ||
+                 now - gGlobalData.mSnapshotBidAskLast[conid].timestamp >= 5;
+    if (stale && gGlobalData.mFreshOrderSnapshotCoroHandle == -1)
+    {
+      printf("Starting snapshot coro for conid %d\n", conid);
+      gGlobalData.mFreshOrderSnapshotResult.conid = conid;
+      gGlobalData.mFreshOrderSnapshotCoroHandle =
+        create_managed_coroutine(PollMarketDataSnapshot, &gGlobalData.mFreshOrderSnapshotResult);
+    }
+  }
+
   // process pending orders - check for completion
-  for (auto it = gGlobalData.mPendingPostOrders.begin(); it != gGlobalData.mPendingPostOrders.end(); )
+  for (auto it = gGlobalData.mPendingPostOrders.begin();
+       it != gGlobalData.mPendingPostOrders.end();)
   {
     auto& pod = *it;
     if (pod.coroHandle != -1)
@@ -881,9 +1039,11 @@ void MainState()
     struct tm* now_tm = localtime(&now);
     const char* time_text = "\t\t\t\t\t\t\t%s\t\t\tAccountId:%s";
     if (now_tm->tm_sec >= 45)
-      ImGui::TextColored(ImVec4(0, 1, 0, 1), time_text, asctime(now_tm), gGlobalData.mAccountId.c_str());
+      ImGui::TextColored(ImVec4(0, 1, 0, 1), time_text, asctime(now_tm),
+                         gGlobalData.mAccountId.c_str());
     else
-      ImGui::TextColored(ImVec4(1, 0, 0, 1), time_text, asctime(now_tm), gGlobalData.mAccountId.c_str());
+      ImGui::TextColored(ImVec4(1, 0, 0, 1), time_text, asctime(now_tm),
+                         gGlobalData.mAccountId.c_str());
 
     ImGui::EndMainMenuBar();
   }
@@ -1041,11 +1201,16 @@ void MainState()
         if (ImGui::BeginTabItem(chartheaders[n].mTicker.c_str(), &open))
         {
           ImGui::Text("Exchange: %s", chartheaders[n].mExchange.c_str());
+          ImGui::SameLine();
+          if (ImGui::Button("New Order"))
+          {
+            gGlobalData.mPlaceOrderConid = conid;
+            gGlobalData.mPlaceOrderTicker = chartheaders[n].mTicker;
+          }
 
           if (s_chartData.find(conid) == s_chartData.end())
           {
-            ImGui::Text("Bid: --  |  Ask: --");
-            ImGui::Text("Last: --");
+            ImGui::Text("Bid: --  |  Ask: --     [Last: --]");
 
             ImGui::TextColored(ImVec4(1, 1, 0, 1), "Loading..");
           }
@@ -1055,14 +1220,14 @@ void MainState()
 
             if (chartData.mSnapshotResult.success)
             {
-              ImGui::Text("Bid: %.2f  |  Ask: %.2f", chartData.mSnapshotResult.bid,
-                          chartData.mSnapshotResult.ask);
-              ImGui::Text("Last: %.2f", chartData.mSnapshotResult.last);
+              const auto& price = gGlobalData.mSnapshotBidAskLast[conid];
+              ImGui::Text("Bid: %.2f  |  Ask: %.2f    [Last: --]", price.bid, price.ask,
+                          price.last);
             }
             else
             {
-              ImGui::Text("Bid: --  |  Ask: --");
-              ImGui::Text("Last: %.2f", chartData.mSnapshotResult.last);
+              const auto& price = gGlobalData.mSnapshotBidAskLast[conid];
+              ImGui::Text("Bid: --  |  Ask: --    [Last: %.2f]", price.last);
             }
 
             PlotStockChart(chartData.mMarketDataResult.data);
