@@ -1118,6 +1118,12 @@ void MainState()
         if (ImGui::BeginTabItem(chartheaders[n].mTicker.c_str(), &open))
         {
           ImGui::Text("Exchange: %s", chartheaders[n].mExchange.c_str());
+          ImGui::SameLine();
+          if (ImGui::Button("New Order"))
+          {
+            gGlobalData.mPlaceOrderConid = conid;
+            gGlobalData.mPlaceOrderTicker = chartheaders[n].mTicker;
+          }
 
           if (s_chartData.find(conid) == s_chartData.end())
           {
