@@ -588,7 +588,7 @@ void PostOrders(mco_coro* co)
       json_object_set_number(order_obj, "auxPrice", (double)entry.aux_price);
 
       json_object_set_string(order_obj, "side", entry.buy ? "BUY" : "SELL");
-      json_object_set_string(order_obj, "ticker", "AAPL");
+      // json_object_set_string(order_obj, "ticker", "AAPL");
       json_object_set_string(order_obj, "tif", "GTC");
       json_object_set_number(order_obj, "quantity", (double)entry.quantity);
       json_object_set_boolean(order_obj, "allOrNone", false);

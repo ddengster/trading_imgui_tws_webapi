@@ -974,7 +974,7 @@ void FreshOrderWindowUI()
                  now - gGlobalData.mSnapshotBidAskLast[conid].timestamp >= 5;
     if (stale && gGlobalData.mFreshOrderSnapshotCoroHandle == -1)
     {
-      printf("Starting snapshot coro for conid %d\n", conid);
+      //printf("Starting snapshot coro for conid %d\n", conid);
       gGlobalData.mFreshOrderSnapshotResult.conid = conid;
       gGlobalData.mFreshOrderSnapshotCoroHandle =
         create_managed_coroutine(PollMarketDataSnapshot, &gGlobalData.mFreshOrderSnapshotResult);
