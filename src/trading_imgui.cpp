@@ -548,12 +548,29 @@ void OrderWindowUI()
           auto it = gGlobalData.mPendingCancels.find(o.orderId);
           bool cancelling = it != gGlobalData.mPendingCancels.end();
           ImGui::PushID(i);
-          if (!cancelling && ImGui::Button("Cancel"))
+          if (!cancelling)
           {
-            CancelOrderData pc;
-            pc.orderId = o.orderId;
-            pc.coroHandle = create_managed_coroutine(CancelOrder, (void*)o.orderId);
-            gGlobalData.mPendingCancels[o.orderId] = pc;
+            if (ImGui::Button("Cancel"))
+            {
+              CancelOrderData pc;
+              pc.orderId = o.orderId;
+              pc.coroHandle = create_managed_coroutine(CancelOrder, (void*)o.orderId);
+              gGlobalData.mPendingCancels[o.orderId] = pc;
+            }
+
+            auto it = gGlobalData.mSnapshotBidAskLast.find(o.conid);
+            if (it != gGlobalData.mSnapshotBidAskLast.end())
+            {
+              SnapshotPriceData pricedata = it->second;
+              
+              if (ImGui::Button("Match Mid")) {}
+              ImGui::SameLine();
+              if (ImGui::Button("Match Ask")) {}
+              if (ImGui::Button("Match 75% Ask")) {}
+              ImGui::SameLine();
+              if (ImGui::Button("Match Bid")) {}
+              if (ImGui::Button("Match 25% Bid")) {}
+            }
           }
           ImGui::PopID();
           if (cancelling)
@@ -561,6 +578,8 @@ void OrderWindowUI()
             ImGui::SameLine();
             ImGui::TextColored(ImVec4(1, 1, 0, 1), "cancelling...");
           }
+
+
         }
       }
 

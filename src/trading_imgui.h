@@ -31,6 +31,7 @@ struct SummaryData
 struct OrderData
 {
   int orderId;
+  int conid;
   std::string symbol;
   std::string side;
   std::string orderType;

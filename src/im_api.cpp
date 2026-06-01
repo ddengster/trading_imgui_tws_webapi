@@ -509,6 +509,7 @@ void PollOrders(mco_coro* co)
       JSON_Object* obj = json_array_get_object(arr, i);
       OrderData od;
       od.orderId = (int)json_object_get_number(obj, "orderId");
+      od.conid = (int)json_object_get_number(obj, "conid");
       const char* symbol = json_object_get_string(obj, "ticker");
       od.symbol = symbol ? symbol : "";
       const char* side = json_object_get_string(obj, "side");
