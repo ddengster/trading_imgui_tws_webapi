@@ -83,6 +83,24 @@ struct CancelOrderData
   int coroHandle = -1;
 };
 
+struct ModifyOrderData
+{
+  int orderId;
+  int conid;
+  std::string symbol;
+  std::string side;
+  std::string orderType;
+  double newPrice;
+  double newQuantity;
+
+  std::string order_id;
+  std::string order_status;
+  std::string encrypt_message;
+
+  bool success = false;
+  int coroHandle = -1;
+};
+
 struct CloseOrderData
 {
   int conid;
@@ -148,6 +166,7 @@ struct GlobalData
   std::vector<PostOrderData> mPendingPostOrders;
   std::vector<CloseOrderData> mPendingCloseOrders;
   std::unordered_map<int, CancelOrderData> mPendingCancels;
+  std::vector<ModifyOrderData> mPendingModifies;
 };
 extern GlobalData gGlobalData;
 
