@@ -678,6 +678,7 @@ void FreshOrderWindowUI()
     }
 
     static float stop_loss_prices[3] = {0.f, 0.f, 0.f};
+    static int stop_loss_quantity[3] = {0, 0, 0};
 
     auto round2decimals = [](float x)
     {
@@ -723,12 +724,17 @@ void FreshOrderWindowUI()
           ImGui::Text("Stop Loss Price (Computed): ");
           int sl_count = current_sl_option == 1 ? 2 : 3;
           float offset_step = lod_offset / (float)sl_count;
+          int q_step = quantity / sl_count;
           for (int i = 0; i < sl_count; i++)
           {
             float offset = offset_step * (i + 1);
             stop_loss_prices[i] = price - offset;
+            if (i == (sl_count - 1))
+              stop_loss_quantity[i] = quantity - (q_step * (sl_count - 1));
+            else
+              stop_loss_quantity[i] = q_step;
             ImGui::SameLine();
-            ImGui::Text("%.2f", stop_loss_prices[i]);
+            ImGui::Text("[$%.2f x%d]", stop_loss_prices[i], stop_loss_quantity[i]);
           }
         }
         
@@ -754,8 +760,8 @@ void FreshOrderWindowUI()
               auto& sl_order = pod.orders.back();
               sl_order.orderType = "STP";
               sl_order.buy = !main_order.buy;
-              sl_order.quantity = (float)quantity;
-              sl_order.aux_price = stop_loss_prices[i];
+              sl_order.quantity = stop_loss_quantity[i];
+              sl_order.price = stop_loss_prices[i];
             }
           }
 
@@ -800,6 +806,18 @@ void FreshOrderWindowUI()
           else // if (sl_count == 3)
             ImGui::InputFloat3("Stop Loss Prices", stop_loss_prices);
           ImGui::Separator();
+
+          int q_step = quantity / sl_count;
+          for (int i = 0; i < sl_count; i++)
+          {
+            if (i == (sl_count - 1))
+              stop_loss_quantity[i] = quantity - (q_step * (sl_count - 1));
+            else
+              stop_loss_quantity[i] = q_step;
+            ImGui::Text("[x%d]", stop_loss_quantity[i]);
+            ImGui::SameLine();
+          }
+          ImGui::NewLine();
         }
 
         if (ImGui::Button("Submit", ImVec2(-1.f, 20.f)))
@@ -824,15 +842,16 @@ void FreshOrderWindowUI()
               snprintf(buf, sizeof(buf), "MainOrder-%d", pod.conid);
               pod.orders[0].cOID = buf;
             }
-
+            int q_step = quantity / sl_count;
             for (int i = 0; i < sl_count; i++)
             {
               pod.orders.push_back({});
               auto& sl_order = pod.orders.back();
               sl_order.orderType = "STP";
               sl_order.buy = !main_order.buy;
-              sl_order.quantity = (float)quantity;
-              sl_order.aux_price = stop_loss_prices[i];
+
+              sl_order.price = stop_loss_prices[i];
+              sl_order.quantity = stop_loss_quantity[i];
               sl_order.parentId = main_order.cOID;
             }
           }

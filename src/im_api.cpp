@@ -581,7 +581,8 @@ void PostOrders(mco_coro* co)
       json_object_set_string(order_obj, "orderType", entry.orderType.c_str());
       json_object_set_string(order_obj, "listingExchange", "NASDAQ");
       json_object_set_boolean(order_obj, "isSingleGroup", true);
-      json_object_set_boolean(order_obj, "outsideRTH", true);
+      if (entry.orderType != "STP")
+        json_object_set_boolean(order_obj, "outsideRTH", true);
 
       json_object_set_number(order_obj, "price", (double)entry.price);
       json_object_set_number(order_obj, "auxPrice", (double)entry.aux_price);
@@ -954,6 +955,7 @@ void PostSuppressQuestions(mco_coro* co)
     json_array_append_string(json_value_get_array(arry), "o354");
     json_array_append_string(json_value_get_array(arry), "o383");
     json_array_append_string(json_value_get_array(arry), "o451");
+    json_array_append_string(json_value_get_array(arry), "o10152");
     json_array_append_string(json_value_get_array(arry), "o10153");
     json_array_append_string(json_value_get_array(arry), "o10331");
     json_array_append_string(json_value_get_array(arry), "o10336");
