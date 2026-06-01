@@ -662,6 +662,23 @@ void FreshOrderWindowUI()
       ImGui::EndCombo();
     }
 
+    static const char* possible_sl_options[] = {"None", "2 Stop Losses", "3 Stop Losses"};
+    static int current_sl_option = 0;
+    if (ImGui::BeginCombo("Stop Loss Attach", possible_sl_options[current_sl_option]))
+    {
+      for (int n = 0; n < IM_ARRAYSIZE(possible_sl_options); n++)
+      {
+        bool is_selected = (current_sl_option == n);
+        if (ImGui::Selectable(possible_sl_options[n], is_selected))
+          current_sl_option = n;
+        if (is_selected)
+          ImGui::SetItemDefaultFocus();
+      }
+      ImGui::EndCombo();
+    }
+
+    static float stop_loss_prices[3] = {0.f, 0.f, 0.f};
+
     auto round2decimals = [](float x)
     {
       return std::round(x * 100.0) / 100.0;
@@ -701,15 +718,47 @@ void FreshOrderWindowUI()
         ImGui::NewLine();
         ImGui::Text("Total Spend: %g", quantity * price);
 
+        if (current_sl_option > 0)
+        {
+          ImGui::Text("Stop Loss Price (Computed): ");
+          int sl_count = current_sl_option == 1 ? 2 : 3;
+          float offset_step = lod_offset / (float)sl_count;
+          for (int i = 0; i < sl_count; i++)
+          {
+            float offset = offset_step * (i + 1);
+            stop_loss_prices[i] = price - offset;
+            ImGui::SameLine();
+            ImGui::Text("%.2f", stop_loss_prices[i]);
+          }
+        }
+        
         if (ImGui::Button("Submit", ImVec2(-1.f, 20.f)))
         {
           gGlobalData.mPendingPostOrders.push_back({});
           auto& pod = gGlobalData.mPendingPostOrders.back();
           pod.conid = gGlobalData.mPlaceOrderConid;
-          pod.orderType = current_order_type;
-          pod.buy = current_action == "BUY";
-          pod.quantity = (float)quantity;
-          pod.price = price;
+
+          pod.orders.push_back({});
+          auto& main_order = pod.orders.back();
+          main_order.orderType = current_order_type;
+          main_order.buy = current_action == "BUY";
+          main_order.quantity = (float)quantity;
+          main_order.price = price;
+
+          if (current_sl_option > 0)
+          {
+            int sl_count = current_sl_option == 1 ? 2 : 3;
+            for (int i = 0; i < sl_count; i++)
+            {
+              pod.orders.push_back({});
+              auto& sl_order = pod.orders.back();
+              sl_order.orderType = "STP";
+              sl_order.buy = !main_order.buy;
+              sl_order.quantity = (float)quantity;
+              sl_order.aux_price = stop_loss_prices[i];
+            }
+          }
+
           pod.coroHandle = create_managed_coroutine(PostOrders, &pod);
         }
         ImGui::Separator();
@@ -741,15 +790,53 @@ void FreshOrderWindowUI()
         ImGui::NewLine();
         ImGui::Text("Total Spend: %g", quantity * price);
 
+        if (current_sl_option > 0)
+        {
+          ImGui::Separator();
+          ImGui::Text("Stop Loss Orders:");
+          int sl_count = current_sl_option == 1 ? 2 : 3;
+          if (sl_count == 2)
+            ImGui::InputFloat2("Stop Loss Prices", stop_loss_prices);
+          else // if (sl_count == 3)
+            ImGui::InputFloat3("Stop Loss Prices", stop_loss_prices);
+          ImGui::Separator();
+        }
+
         if (ImGui::Button("Submit", ImVec2(-1.f, 20.f)))
         {
           gGlobalData.mPendingPostOrders.push_back({});
           auto& pod = gGlobalData.mPendingPostOrders.back();
           pod.conid = gGlobalData.mPlaceOrderConid;
-          pod.orderType = current_order_type;
-          pod.buy = current_action == "BUY";
-          pod.quantity = (float)quantity;
-          pod.price = price;
+
+          pod.orders.push_back({});
+          auto& main_order = pod.orders.back();
+          main_order.orderType = current_order_type;
+          main_order.buy = current_action == "BUY";
+          main_order.quantity = (float)quantity;
+          main_order.price = price;
+
+          if (current_sl_option > 0)
+          {
+            int sl_count = current_sl_option == 1 ? 2 : 3;
+            if (sl_count > 0)
+            {
+              char buf[32] = {};
+              snprintf(buf, sizeof(buf), "MainOrder-%d", pod.conid);
+              pod.orders[0].cOID = buf;
+            }
+
+            for (int i = 0; i < sl_count; i++)
+            {
+              pod.orders.push_back({});
+              auto& sl_order = pod.orders.back();
+              sl_order.orderType = "STP";
+              sl_order.buy = !main_order.buy;
+              sl_order.quantity = (float)quantity;
+              sl_order.aux_price = stop_loss_prices[i];
+              sl_order.parentId = main_order.cOID;
+            }
+          }
+
           pod.coroHandle = create_managed_coroutine(PostOrders, &pod);
         }
         ImGui::Separator();
@@ -772,17 +859,34 @@ void FreshOrderWindowUI()
         ImGui::PushID(idx);
         if (pod.coroHandle != -1)
         {
-          ImGui::TextColored(ImVec4(1, 1, 0, 1), "Order #%d: submitting...", idx);
+          ImGui::TextColored(ImVec4(1, 1, 0, 1), "Batch #%d: submitting (%zu orders)...", idx,
+                             pod.orders.size());
         }
-        else if (pod.success)
+        else
         {
-          ImGui::TextColored(ImVec4(0, 1, 0, 1), "Order #%d: OK (ID: %s, status: %s)", idx,
-                             pod.order_id.c_str(), pod.order_status.c_str());
-        }
-        else if (!pod.order_status.empty())
-        {
-          ImGui::TextColored(ImVec4(1, 0, 0, 1), "Order #%d: FAILED - %s", idx,
-                             pod.order_status.c_str());
+          for (size_t oi = 0; oi < pod.orders.size(); oi++)
+          {
+            ImGui::Text("  %s %s x%.0f @ ", pod.orders[oi].buy ? "BUY" : "SELL",
+                        pod.orders[oi].orderType.c_str(), pod.orders[oi].quantity);
+            ImGui::SameLine();
+            if (oi < pod.order_ids.size())
+            {
+              if (!pod.order_ids[oi].empty())
+              {
+                ImGui::TextColored(ImVec4(0, 1, 0, 1), "OK (ID: %s, %s)", pod.order_ids[oi].c_str(),
+                                   pod.order_statuses[oi].c_str());
+              }
+              else
+              {
+                ImGui::TextColored(ImVec4(1, 0, 0, 1), "FAILED - %s",
+                                   pod.order_statuses[oi].c_str());
+              }
+            }
+            else
+            {
+              ImGui::TextColored(ImVec4(1, 1, 0, 1), "waiting...");
+            }
+          }
         }
         ImGui::PopID();
       }
@@ -875,9 +979,16 @@ void FreshOrderWindowUI()
     if (pod.coroHandle == -1)
     {
       if (pod.success)
-        printf("Order submitted successfully! Order ID: %s\n", pod.order_id.c_str());
-      else if (!pod.order_status.empty())
-        printf("Order submission failed! Error: %s\n", pod.order_status.c_str());
+      {
+        for (size_t oi = 0; oi < pod.order_ids.size(); oi++)
+          printf("Order [%zu] OK: ID=%s status=%s\n", oi, pod.order_ids[oi].c_str(),
+                 pod.order_statuses[oi].c_str());
+      }
+      else if (!pod.order_statuses.empty())
+      {
+        for (auto& s : pod.order_statuses)
+          printf("Order submission failed! Error: %s\n", s.c_str());
+      }
       it = gGlobalData.mPendingPostOrders.erase(it);
     }
     else

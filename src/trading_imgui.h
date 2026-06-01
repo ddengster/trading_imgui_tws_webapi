@@ -50,17 +50,25 @@ struct PositionsResult
   bool success = false;
 };
 
-struct PostOrderData
+struct PostOrderEntry
 {
-  int conid;
   std::string orderType;
   float price = 1.f;
   float aux_price = 0.f;
   bool buy = true;
   float quantity;
 
-  std::string order_id;
-  std::string order_status;
+  std::string cOID;  // identifier used for SL orders linked to a main order
+  std::string parentId;  // for TP/SL orders
+};
+
+struct PostOrderData
+{
+  int conid;
+  std::vector<PostOrderEntry> orders;
+
+  std::vector<std::string> order_ids;
+  std::vector<std::string> order_statuses;
   std::string encrypt_message;
 
   bool success = false;
