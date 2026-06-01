@@ -1,9 +1,8 @@
-
-![](ss.PNG)
-
 # Trading imgui (via TWS Web Api)
 
 Trading with IMGUI view. Contract search, risk-based orders, position order/management, stock charts.
+
+![](ss.PNG)
 
 TWS Documentation: https://interactivebrokers.github.io/cpwebapi/quickstart
 
