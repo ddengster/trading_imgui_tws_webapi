@@ -542,7 +542,14 @@ void PostOrders(mco_coro* co)
 {
   auto* data = static_cast<PostOrderData*>(mco_get_user_data(co));
 
-  char json_buf[1024] = {};
+  int n_orders = (int)data->orders.size();
+  if (n_orders == 0)
+  {
+    data->success = false;
+    return;
+  }
+
+  char json_buf[4096] = {};
   {
     // https://www.interactivebrokers.eu/campus/ibkr-api-page/cpapi-v1/?utm_source=chatgpt.com#place-order
     JSON_Value* base = json_value_init_object();
@@ -550,6 +557,7 @@ void PostOrders(mco_coro* co)
 
     auto arry = json_value_init_array();
 
+    for (auto& entry : data->orders)
     {
       JSON_Value* order = json_value_init_object();
       auto order_obj = json_value_get_object(order);
@@ -565,23 +573,24 @@ void PostOrders(mco_coro* co)
         json_object_set_string(order_obj, "secType", buf);
       }
 
-      //json_object_set_string(order_obj, "cOID", "AAPL-BUY-1");
-      json_object_set_null(order_obj, "parentId");
+      if (!entry.cOID.empty())
+        json_object_set_string(order_obj, "cOID", entry.cOID.c_str());
+      if (!entry.parentId.empty())
+        json_object_set_string(order_obj, "parentId", entry.parentId.c_str());
 
-      json_object_set_string(order_obj, "orderType", data->orderType.c_str());
+      json_object_set_string(order_obj, "orderType", entry.orderType.c_str());
       json_object_set_string(order_obj, "listingExchange", "NASDAQ");
       json_object_set_boolean(order_obj, "isSingleGroup", true);
-      json_object_set_boolean(order_obj, "outsideRTH", true);
+      if (entry.orderType != "STP")
+        json_object_set_boolean(order_obj, "outsideRTH", true);
 
-      json_object_set_number(order_obj, "price", (double)data->price);
-      //if (data->orderType == "STOP_LIMIT" || data->orderType == "TRAILLMT")
-      json_object_set_number(order_obj, "auxPrice", (double)data->aux_price);
+      json_object_set_number(order_obj, "price", (double)entry.price);
+      json_object_set_number(order_obj, "auxPrice", (double)entry.aux_price);
 
-      json_object_set_string(order_obj, "side", data->buy ? "BUY" : "SELL");
-      json_object_set_string(order_obj, "ticker", "AAPL");
+      json_object_set_string(order_obj, "side", entry.buy ? "BUY" : "SELL");
+      // json_object_set_string(order_obj, "ticker", "AAPL");
       json_object_set_string(order_obj, "tif", "GTC");
-      //json_object_set_number(order_obj, "trailingAmt", 0.0);
-      json_object_set_number(order_obj, "quantity", (double)data->quantity);
+      json_object_set_number(order_obj, "quantity", (double)entry.quantity);
       json_object_set_boolean(order_obj, "allOrNone", false);
       json_object_set_string(order_obj, "referrer", "QuickTrade");
 
@@ -618,6 +627,9 @@ void PostOrders(mco_coro* co)
   yield();
   yield_until_true([](void* ud) { return naettComplete((naettRes*)ud) != 0; }, rr.res);
 
+  data->order_ids.clear();
+  data->order_statuses.clear();
+
   int status = naettGetStatus(rr.res);
   if (status == 200)
   {
@@ -630,35 +642,41 @@ void PostOrders(mco_coro* co)
     JSON_Array* arr = json_value_get_array(val);
     if (arr && json_array_get_count(arr) > 0)
     {
-      JSON_Object* obj = json_array_get_object(arr, 0);
-      if (obj)
+      int n_responses = (int)json_array_get_count(arr);
+      data->success = true;
+      for (int i = 0; i < n_responses; i++)
       {
-        const char* oid = json_object_get_string(obj, "order_id");
-        if (oid && strlen(oid) > 0)
+        JSON_Object* obj = json_array_get_object(arr, i);
+        if (obj)
         {
-          data->order_id = oid;
-          const char* ost = json_object_get_string(obj, "order_status");
-          if (ost)
-            data->order_status = ost;
-          const char* emsg = json_object_get_string(obj, "encrypt_message");
-          if (emsg)
-            data->encrypt_message = emsg;
-          data->success = true;
-        }
-        else
-        {
-          JSON_Array* msg_arr = json_object_get_array(obj, "message");
-          if (msg_arr && json_array_get_count(msg_arr) > 0)
+          const char* oid = json_object_get_string(obj, "order_id");
+          if (oid && strlen(oid) > 0)
           {
-            const char* err = json_array_get_string(msg_arr, 0);
-            if (err) data->order_status = err;
+            data->order_ids.push_back(oid);
+            const char* ost = json_object_get_string(obj, "order_status");
+            data->order_statuses.push_back(ost ? ost : "");
+            const char* emsg = json_object_get_string(obj, "encrypt_message");
+            if (emsg && i == 0)
+              data->encrypt_message = emsg;
           }
-          if (data->order_status.empty())
+          else
           {
-            const char* msg = json_object_get_string(obj, "message");
-            if (msg) data->order_status = msg;
+            std::string err_msg;
+            JSON_Array* msg_arr = json_object_get_array(obj, "message");
+            if (msg_arr && json_array_get_count(msg_arr) > 0)
+            {
+              const char* err = json_array_get_string(msg_arr, 0);
+              if (err) err_msg = err;
+            }
+            if (err_msg.empty())
+            {
+              const char* msg = json_object_get_string(obj, "message");
+              if (msg) err_msg = msg;
+            }
+            data->order_ids.push_back("");
+            data->order_statuses.push_back(err_msg.empty() ? "FAILED" : err_msg);
+            data->success = false;
           }
-          data->success = false;
         }
       }
     }
@@ -668,7 +686,7 @@ void PostOrders(mco_coro* co)
       if (obj)
       {
         const char* err = json_object_get_string(obj, "error");
-        if (err) data->order_status = err;
+        data->order_statuses.push_back(err ? err : "Unknown error");
         data->success = false;
       }
     }
@@ -937,6 +955,7 @@ void PostSuppressQuestions(mco_coro* co)
     json_array_append_string(json_value_get_array(arry), "o354");
     json_array_append_string(json_value_get_array(arry), "o383");
     json_array_append_string(json_value_get_array(arry), "o451");
+    json_array_append_string(json_value_get_array(arry), "o10152");
     json_array_append_string(json_value_get_array(arry), "o10153");
     json_array_append_string(json_value_get_array(arry), "o10331");
     json_array_append_string(json_value_get_array(arry), "o10336");
