@@ -8,6 +8,8 @@ TWS Documentation: https://interactivebrokers.github.io/cpwebapi/quickstart
 
 TWS Web Api: https://www.interactivebrokers.eu/campus/ibkr-api-page/cpapi-v1/#accounts
 
+Windows/Directx11 requirement.
+
 ## Setup & running
 
 - Download java https://www.java.com/en/download/ and install it. `java --version` to see if it works
