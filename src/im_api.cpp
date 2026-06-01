@@ -509,6 +509,7 @@ void PollOrders(mco_coro* co)
       JSON_Object* obj = json_array_get_object(arr, i);
       OrderData od;
       od.orderId = (int)json_object_get_number(obj, "orderId");
+      od.conid = (int)json_object_get_number(obj, "conid");
       const char* symbol = json_object_get_string(obj, "ticker");
       od.symbol = symbol ? symbol : "";
       const char* side = json_object_get_string(obj, "side");
@@ -938,6 +939,118 @@ void CancelOrder(mco_coro* co)
     if (body && sz > 0) 
       printf("%s\n", (const char*)body);
     pc.success = false;
+  }
+
+  rr.cleanup();
+}
+
+void PostModifyOrder(mco_coro* co)
+{
+  auto* data = static_cast<ModifyOrderData*>(mco_get_user_data(co));
+
+  char json_buf[2048] = {};
+  {
+    JSON_Value* base = json_value_init_object();
+    auto base_obj = json_value_get_object(base);
+
+    json_object_set_number(base_obj, "orderId", data->orderId);
+    json_object_set_number(base_obj, "conid", data->conid);
+    json_object_set_string(base_obj, "orderType", data->orderType.c_str());
+    json_object_set_string(base_obj, "side", data->side.c_str());
+    json_object_set_string(base_obj, "tif", "GTC");
+    json_object_set_number(base_obj, "price", data->newPrice);
+    json_object_set_number(base_obj, "quantity", data->newQuantity);
+
+    JSON_Status ret = json_serialize_to_buffer(base, json_buf, sizeof(json_buf));
+    if (ret != JSONSuccess)
+    {
+      json_value_free(base);
+      data->success = false;
+      return;
+    }
+    json_value_free(base);
+  }
+  printf("%s\n", json_buf);
+
+  ReqRes rr;
+  naettOption* options[] = {naettMethod("POST"), naettHeader("Content-Type", "application/json"),
+                            naettBody(json_buf, strlen(json_buf))};
+
+  char url[512] = {};
+  snprintf(url, sizeof(url), BASE_URL "/iserver/account/%s/order/%d",
+           gGlobalData.mAccountId.c_str(), data->orderId);
+  rr.req = naettRequestWithOptions(url, 3, (const naettOption**)&options);
+  rr.res = naettMake(rr.req);
+
+  if (!rr.valid())
+  {
+    data->success = false;
+    return;
+  }
+
+  yield();
+  yield_until_true([](void* ud) { return naettComplete((naettRes*)ud) != 0; }, rr.res);
+
+  int status = naettGetStatus(rr.res);
+  if (status == 200)
+  {
+    int sz = 0;
+    const void* body = naettGetBody(rr.res, &sz);
+    printf("%s\n", (const char*)body);
+
+    JSON_Value* val = json_parse_string((const char*)body);
+    JSON_Array* arr = json_value_get_array(val);
+    if (arr && json_array_get_count(arr) > 0)
+    {
+      JSON_Object* obj = json_array_get_object(arr, 0);
+      if (obj)
+      {
+        const char* oid = json_object_get_string(obj, "order_id");
+        if (oid && strlen(oid) > 0)
+        {
+          data->order_id = oid;
+          const char* ost = json_object_get_string(obj, "order_status");
+          if (ost) data->order_status = ost;
+          const char* emsg = json_object_get_string(obj, "encrypt_message");
+          if (emsg) data->encrypt_message = emsg;
+          data->success = true;
+        }
+        else
+        {
+          JSON_Array* msg_arr = json_object_get_array(obj, "message");
+          if (msg_arr && json_array_get_count(msg_arr) > 0)
+          {
+            const char* err = json_array_get_string(msg_arr, 0);
+            if (err) data->order_status = err;
+          }
+          if (data->order_status.empty())
+          {
+            const char* msg = json_object_get_string(obj, "message");
+            if (msg) data->order_status = msg;
+          }
+          data->success = false;
+        }
+      }
+    }
+    else
+    {
+      JSON_Object* obj = json_value_get_object(val);
+      if (obj)
+      {
+        const char* err = json_object_get_string(obj, "error");
+        if (err) data->order_status = err;
+        data->success = false;
+      }
+    }
+    json_value_free(val);
+  }
+  else
+  {
+    int sz = 0;
+    const void* body = naettGetBody(rr.res, &sz);
+    printf("Error modifying order %d: HTTP %d\n", data->orderId, status);
+    printf("%s\n", (const char*)body);
+    data->success = false;
   }
 
   rr.cleanup();

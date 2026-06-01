@@ -548,12 +548,93 @@ void OrderWindowUI()
           auto it = gGlobalData.mPendingCancels.find(o.orderId);
           bool cancelling = it != gGlobalData.mPendingCancels.end();
           ImGui::PushID(i);
-          if (!cancelling && ImGui::Button("Cancel"))
+          if (!cancelling)
           {
-            CancelOrderData pc;
-            pc.orderId = o.orderId;
-            pc.coroHandle = create_managed_coroutine(CancelOrder, (void*)o.orderId);
-            gGlobalData.mPendingCancels[o.orderId] = pc;
+            if (ImGui::Button("Cancel"))
+            {
+              CancelOrderData pc;
+              pc.orderId = o.orderId;
+              pc.coroHandle = create_managed_coroutine(CancelOrder, (void*)o.orderId);
+              gGlobalData.mPendingCancels[o.orderId] = pc;
+            }
+
+            auto it = gGlobalData.mSnapshotBidAskLast.find(o.conid);
+            if (it != gGlobalData.mSnapshotBidAskLast.end())
+            {
+              SnapshotPriceData pricedata = it->second;
+              float mid = (pricedata.bid + pricedata.ask) * 0.5f;
+              float offset = 0.f; // for testing, should nvr execute
+              
+              if (ImGui::Button("Mid")) 
+              {
+                gGlobalData.mPendingModifies.push_back({});
+                auto& mod = gGlobalData.mPendingModifies.back();
+                mod.orderId = o.orderId;
+                mod.conid = o.conid;
+                mod.symbol = o.symbol;
+                mod.side = o.side;
+                mod.orderType = o.orderType;
+                mod.newPrice = mid - offset;
+                mod.newQuantity = o.totalSize;
+                mod.coroHandle = create_managed_coroutine(PostModifyOrder, &mod);
+              }
+
+              if (ImGui::Button("Ask")) 
+              {
+                gGlobalData.mPendingModifies.push_back({});
+                auto& mod = gGlobalData.mPendingModifies.back();
+                mod.orderId = o.orderId;
+                mod.conid = o.conid;
+                mod.symbol = o.symbol;
+                mod.side = o.side;
+                mod.orderType = o.orderType;
+                mod.newPrice = pricedata.ask - offset;
+                mod.newQuantity = o.totalSize;
+                mod.coroHandle = create_managed_coroutine(PostModifyOrder, &mod);
+              }
+              ImGui::SameLine();
+              if (ImGui::Button("Bid"))
+              {
+                gGlobalData.mPendingModifies.push_back({});
+                auto& mod = gGlobalData.mPendingModifies.back();
+                mod.orderId = o.orderId;
+                mod.conid = o.conid;
+                mod.symbol = o.symbol;
+                mod.side = o.side;
+                mod.orderType = o.orderType;
+                mod.newPrice = pricedata.bid - offset;
+                mod.newQuantity = o.totalSize;
+                mod.coroHandle = create_managed_coroutine(PostModifyOrder, &mod);
+              }
+
+              if (ImGui::Button("75% Ask")) 
+              {
+                gGlobalData.mPendingModifies.push_back({});
+                auto& mod = gGlobalData.mPendingModifies.back();
+                mod.orderId = o.orderId;
+                mod.conid = o.conid;
+                mod.symbol = o.symbol;
+                mod.side = o.side;
+                mod.orderType = o.orderType;
+                mod.newPrice = (mid + pricedata.ask) * 0.5f - offset;
+                mod.newQuantity = o.totalSize;
+                mod.coroHandle = create_managed_coroutine(PostModifyOrder, &mod);
+              }
+              ImGui::SameLine();
+              if (ImGui::Button("25% Bid")) 
+              {
+                gGlobalData.mPendingModifies.push_back({});
+                auto& mod = gGlobalData.mPendingModifies.back();
+                mod.orderId = o.orderId;
+                mod.conid = o.conid;
+                mod.symbol = o.symbol;
+                mod.side = o.side;
+                mod.orderType = o.orderType;
+                mod.newPrice = (mid + pricedata.bid) * 0.5f - offset;
+                mod.newQuantity = o.totalSize;
+                mod.coroHandle = create_managed_coroutine(PostModifyOrder, &mod);
+              }
+            }
           }
           ImGui::PopID();
           if (cancelling)
@@ -561,6 +642,8 @@ void OrderWindowUI()
             ImGui::SameLine();
             ImGui::TextColored(ImVec4(1, 1, 0, 1), "cancelling...");
           }
+
+
         }
       }
 
@@ -590,6 +673,33 @@ void OrderWindowUI()
       else
         printf("Failed to cancel order %d\n", pc.orderId);
       it = gGlobalData.mPendingCancels.erase(it);
+    }
+    else
+    {
+      ++it;
+    }
+  }
+
+  for (auto it = gGlobalData.mPendingModifies.begin(); it != gGlobalData.mPendingModifies.end();)
+  {
+    auto& mod = *it;
+    if (mod.coroHandle != -1)
+    {
+      mco_coro* co = get_coroutine(mod.coroHandle);
+      if (!co || mco_status(co) == MCO_DEAD)
+      {
+        destroy_coroutine(mod.coroHandle);
+        mod.coroHandle = -1;
+      }
+    }
+    if (mod.coroHandle == -1)
+    {
+      if (mod.success)
+        printf("Order %d modified successfully (ID: %s, status: %s)\n", mod.orderId,
+               mod.order_id.c_str(), mod.order_status.c_str());
+      else
+        printf("Failed to modify order %d: %s\n", mod.orderId, mod.order_status.c_str());
+      it = gGlobalData.mPendingModifies.erase(it);
     }
     else
     {

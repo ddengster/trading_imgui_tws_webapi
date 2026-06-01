@@ -80,5 +80,6 @@ void PollConId(mco_coro* co);
 void PollOrders(mco_coro* co);
 void PostOrders(mco_coro* co);
 void PostCloseOrder(mco_coro* co);
+void PostModifyOrder(mco_coro* co);
 void CancelOrder(mco_coro* co);
 void PostSuppressQuestions(mco_coro* co);
