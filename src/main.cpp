@@ -104,6 +104,13 @@ int main(int, char**)
     naettInit(nullptr);
     json_set_float_serialization_format("%.2f");
 
+    FILE* app_f = fopen("app_data.json", "r");
+    if (app_f)
+    {
+      fscanf(app_f, "todays_risk=%d", &gGlobalData.mTodaysRisk);
+      fclose(app_f);
+    }
+
     bool show_demo_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
@@ -178,6 +185,13 @@ int main(int, char**)
         HRESULT hr = g_pSwapChain->Present(1, 0);   // Present with vsync
         //HRESULT hr = g_pSwapChain->Present(0, 0); // Present without vsync
         g_SwapChainOccluded = (hr == DXGI_STATUS_OCCLUDED);
+    }
+
+    app_f = fopen("app_data.json", "wb+");
+    if (app_f)
+    {
+      fprintf(app_f, "todays_risk=%d", gGlobalData.mTodaysRisk);
+      fclose(app_f);
     }
 
     // Cleanup
