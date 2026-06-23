@@ -8,140 +8,140 @@
 
 struct PositionData
 {
-  std::string symbol;
-  std::string secType;
-  std::string assetClass;
-  int conid;
-  double size;
-  double averageCost;
-  double marketPrice;
-  double marketValue;
-  double realizedPNL;
-  double unrealizedPNL;
+  std::string mSymbol;
+  std::string mSecType;
+  std::string mAssetClass;
+  int mConid;
+  double mSize;
+  double mAverageCost;
+  double mMarketPrice;
+  double mMarketValue;
+  double mRealizedPNL;
+  double mUnrealizedPNL;
 };
 
 struct SummaryData
 {
-  double cashUSD;
-  double cashSGD;
-  double netLiquidationValSGD;
-  double buyingPowerSGD;
+  double mCashUSD;
+  double mCashSGD;
+  double mNetLiquidationValSGD;
+  double mBuyingPowerSGD;
 };
 
 struct OrderData
 {
-  int orderId;
-  int conid;
-  std::string symbol;
-  std::string side;
-  std::string orderType;
-  double totalSize;
-  double filledQuantity;
-  double remainingQuantity;
-  double limitPrice;
-  double stopPrice;
-  std::string status;
-  std::string lastExecutionTime;
+  int mOrderId;
+  int mConid;
+  std::string mSymbol;
+  std::string mSide;
+  std::string mOrderType;
+  double mTotalSize;
+  double mFilledQuantity;
+  double mRemainingQuantity;
+  double mLimitPrice;
+  double mStopPrice;
+  std::string mStatus;
+  std::string mLastExecutionTime;
 };
 
 struct PositionsResult
 {
-  std::string accountId;
-  std::vector<PositionData> positions;
-  bool success = false;
+  std::string mAccountId;
+  std::vector<PositionData> mPositions;
+  bool mSuccess = false;
 };
 
 struct PostOrderEntry
 {
-  std::string orderType;
-  float price = 1.f;
-  float aux_price = 0.f;
-  bool buy = true;
-  float quantity;
+  std::string mOrderType;
+  float mPrice = 1.f;
+  float mAuxPrice = 0.f;
+  bool mBuy = true;
+  float mQuantity;
 
-  std::string cOID;  // identifier used for SL orders linked to a main order
-  std::string parentId;  // for TP/SL orders
+  std::string mCOID;  // identifier used for SL orders linked to a main order
+  std::string mParentId;  // for TP/SL orders
 };
 
 struct PostOrderData
 {
-  int conid;
-  std::vector<PostOrderEntry> orders;
+  int mConid;
+  std::vector<PostOrderEntry> mOrders;
 
-  std::vector<std::string> order_ids;
-  std::vector<std::string> order_statuses;
-  std::string encrypt_message;
+  std::vector<std::string> mAssignedOrderIds;
+  std::vector<std::string> mOrderStatuses;
+  std::string mEncryptMessage;
 
-  bool success = false;
-  int coroHandle = -1;
+  bool mSuccess = false;
+  int mCoroHandle = -1;
 };
 
 struct CancelOrderData
 {
-  int orderId;
-  bool success = false;
-  int coroHandle = -1;
+  int mOrderId;
+  bool mSuccess = false;
+  int mCoroHandle = -1;
 };
 
 struct ModifyOrderData
 {
-  int orderId;
-  int conid;
-  std::string symbol;
-  std::string side;
-  std::string orderType;
-  double newPrice;
-  double newQuantity;
+  int mOrderId;
+  int mConid;
+  std::string mSymbol;
+  std::string mSide;
+  std::string mOrderType;
+  double mNewPrice;
+  double mNewQuantity;
 
-  std::string order_id;
-  std::string order_status;
-  std::string encrypt_message;
+  std::string mAssignedOrderId;
+  std::string mOrderStatus;
+  std::string mEncryptMessage;
 
-  bool success = false;
-  int coroHandle = -1;
+  bool mSuccess = false;
+  int mCoroHandle = -1;
 };
 
 struct CloseOrderData
 {
-  int conid;
-  double quantity;
-  bool buy;
-  std::string symbol;
+  int mConid;
+  double mQuantity;
+  bool mBuy;
+  std::string mSymbol;
 
-  std::string order_id;
-  std::string order_status;
-  std::string encrypt_message;
+  std::string mAssignedOrderId;
+  std::string mOrderStatus;
+  std::string mEncryptMessage;
 
-  bool success = false;
-  int coroHandle = -1;
+  bool mSuccess = false;
+  int mCoroHandle = -1;
 };
 
 struct LedgerResult
 {
-  std::string accountId;
-  SummaryData summary;
-  bool success = false;
+  std::string mAccountId;
+  SummaryData mSummary;
+  bool mSuccess = false;
 };
 
 struct SnapshotResult
 {
-  int conid;
-  bool success = false;
+  int mConid;
+  bool mSuccess = false;
 };
 
 struct SnapshotPriceData
 {
-  double last = 0.0;
-  double bid = 0.0;
-  double ask = 0.0;
-  time_t timestamp = 0;
+  double mLast = 0.0;
+  double mBid = 0.0;
+  double mAsk = 0.0;
+  time_t mTimestamp = 0;
 };
 
 struct SummaryResult
 {
-  std::string accountId;
-  SummaryData summary;
-  bool success = false;
+  std::string mAccountId;
+  SummaryData mSummary;
+  bool mSuccess = false;
 };
 
 struct GlobalData

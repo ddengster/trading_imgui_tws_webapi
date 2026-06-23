@@ -32,7 +32,7 @@ bool ConnectingState()
     ShellExecute(NULL, "open", "https://localhost:5000/", NULL, NULL, SW_SHOWNORMAL);
   }
 
-  static int statuscode = -1;
+  static int status_code = -1;
   static int authenticated = 0;
 
   static int coro_handle = -1;
@@ -44,124 +44,124 @@ bool ConnectingState()
     if (co == nullptr || mco_status(co) == MCO_DEAD)
     {
       mco_pop(co, &authenticated, sizeof(authenticated));
-      mco_pop(co, &statuscode, sizeof(statuscode));
+      mco_pop(co, &status_code, sizeof(status_code));
 
       destroy_coroutine(coro_handle);
       coro_handle = -1;
     }
   }
 
-  if (statuscode != 200)
-    ImGui::Text("statuscode: %d", statuscode);
+  if (status_code != 200)
+    ImGui::Text("statuscode: %d", status_code);
   else
-    ImGui::Text("statuscode: %d (auth: %d)", statuscode, authenticated ? 1 : 0);
+    ImGui::Text("statuscode: %d (auth: %d)", status_code, authenticated ? 1 : 0);
 
   ImGui::End();
-  return statuscode == 200 && authenticated;
+  return status_code == 200 && authenticated;
 }
 
 void PortfolioUI()
 {
-  static int posCoroHandle = -1;
-  static float posRefreshTimer = -1.0f;
-  static int ledgerCoroHandle = -1;
-  static int summaryCoroHandle = -1;
+  static int pos_coro_handle = -1;
+  static float pos_refresh_timer = -1.0f;
+  static int ledger_coro_handle = -1;
+  static int summary_coro_handle = -1;
 
-  static float ledgerRefreshTimer = -1.0f;
-  static float summaryRefreshTimer = -1.0f;
+  static float ledger_refresh_timer = -1.0f;
+  static float summary_refresh_timer = -1.0f;
 
-  if (posRefreshTimer < 0.f)
+  if (pos_refresh_timer < 0.f)
   {
-    if (posCoroHandle == -1)
+    if (pos_coro_handle == -1)
     {
-      gGlobalData.mPositions.accountId = gGlobalData.mAccountId;
-      posCoroHandle = create_managed_coroutine(PollPositions, &gGlobalData.mPositions);
+      gGlobalData.mPositions.mAccountId = gGlobalData.mAccountId;
+      pos_coro_handle = create_managed_coroutine(PollPositions, &gGlobalData.mPositions);
     }
     else
     {
-      mco_coro* co = get_coroutine(posCoroHandle);
+      mco_coro* co = get_coroutine(pos_coro_handle);
       if (!co || mco_status(co) == MCO_DEAD)
       {
-        destroy_coroutine(posCoroHandle);
-        posCoroHandle = -1;
-        posRefreshTimer = 0.0f;
+        destroy_coroutine(pos_coro_handle);
+        pos_coro_handle = -1;
+        pos_refresh_timer = 0.0f;
       }
     }
   }
   else
   {
-    posRefreshTimer += ImGui::GetIO().DeltaTime;
-    if (posRefreshTimer >= 5.0f)
+    pos_refresh_timer += ImGui::GetIO().DeltaTime;
+    if (pos_refresh_timer >= 5.0f)
     {
-      gGlobalData.mPositions.accountId = gGlobalData.mAccountId;
-      posCoroHandle = create_managed_coroutine(PollPositions, &gGlobalData.mPositions);
-      posRefreshTimer = 0.0f;
+      gGlobalData.mPositions.mAccountId = gGlobalData.mAccountId;
+      pos_coro_handle = create_managed_coroutine(PollPositions, &gGlobalData.mPositions);
+      pos_refresh_timer = 0.0f;
     }
   }
 
-  if (ledgerRefreshTimer < 0.f)
+  if (ledger_refresh_timer < 0.f)
   {
-    if (ledgerCoroHandle == -1)
+    if (ledger_coro_handle == -1)
     {
-      gGlobalData.mLedgerResult.accountId = gGlobalData.mAccountId;
-      ledgerCoroHandle = create_managed_coroutine(PollLedger, &gGlobalData.mLedgerResult);
+      gGlobalData.mLedgerResult.mAccountId = gGlobalData.mAccountId;
+      ledger_coro_handle = create_managed_coroutine(PollLedger, &gGlobalData.mLedgerResult);
     }
     else
     {
-      mco_coro* co = get_coroutine(ledgerCoroHandle);
+      mco_coro* co = get_coroutine(ledger_coro_handle);
       if (!co || mco_status(co) == MCO_DEAD)
       {
-        destroy_coroutine(ledgerCoroHandle);
-        ledgerCoroHandle = -1;
-        ledgerRefreshTimer = 0.0f;
+        destroy_coroutine(ledger_coro_handle);
+        ledger_coro_handle = -1;
+        ledger_refresh_timer = 0.0f;
       }
     }
   }
   else
   {
-    ledgerRefreshTimer += ImGui::GetIO().DeltaTime;
-    if (ledgerRefreshTimer >= 5.0f)
+    ledger_refresh_timer += ImGui::GetIO().DeltaTime;
+    if (ledger_refresh_timer >= 5.0f)
     {
-      gGlobalData.mLedgerResult.accountId = gGlobalData.mAccountId;
-      ledgerCoroHandle = create_managed_coroutine(PollLedger, &gGlobalData.mLedgerResult);
-      ledgerRefreshTimer = 0.0f;
+      gGlobalData.mLedgerResult.mAccountId = gGlobalData.mAccountId;
+      ledger_coro_handle = create_managed_coroutine(PollLedger, &gGlobalData.mLedgerResult);
+      ledger_refresh_timer = 0.0f;
     }
   }
 
-  if (summaryRefreshTimer < 0.f)
+  if (summary_refresh_timer < 0.f)
   {
-    if (summaryCoroHandle == -1)
+    if (summary_coro_handle == -1)
     {
-      gGlobalData.mSummaryResult.accountId = gGlobalData.mAccountId;
-      summaryCoroHandle = create_managed_coroutine(PollSummary, &gGlobalData.mSummaryResult);
+      gGlobalData.mSummaryResult.mAccountId = gGlobalData.mAccountId;
+      summary_coro_handle = create_managed_coroutine(PollSummary, &gGlobalData.mSummaryResult);
     }
     else
     {
-      mco_coro* co = get_coroutine(summaryCoroHandle);
+      mco_coro* co = get_coroutine(summary_coro_handle);
       if (!co || mco_status(co) == MCO_DEAD)
       {
-        destroy_coroutine(summaryCoroHandle);
-        summaryCoroHandle = -1;
-        summaryRefreshTimer = 0.0f;
+        destroy_coroutine(summary_coro_handle);
+        summary_coro_handle = -1;
+        summary_refresh_timer = 0.0f;
       }
     }
   }
   else
   {
-    summaryRefreshTimer += ImGui::GetIO().DeltaTime;
-    if (summaryRefreshTimer >= 5.0f)
+    summary_refresh_timer += ImGui::GetIO().DeltaTime;
+    if (summary_refresh_timer >= 5.0f)
     {
-      gGlobalData.mSummaryResult.accountId = gGlobalData.mAccountId;
-      summaryCoroHandle = create_managed_coroutine(PollSummary, &gGlobalData.mSummaryResult);
-      summaryRefreshTimer = 0.0f;
+      gGlobalData.mSummaryResult.mAccountId = gGlobalData.mAccountId;
+      summary_coro_handle = create_managed_coroutine(PollSummary, &gGlobalData.mSummaryResult);
+      summary_refresh_timer = 0.0f;
     }
   }
 
-  bool ledgerReady = (ledgerCoroHandle == -1 && gGlobalData.mLedgerResult.success);
-  bool summaryReady = summaryCoroHandle == -1 && gGlobalData.mSummaryResult.success;
+  bool ledger_ready = (ledger_coro_handle == -1 && gGlobalData.mLedgerResult.mSuccess);
+  bool summary_ready = summary_coro_handle == -1 && gGlobalData.mSummaryResult.mSuccess;
 
   if (!gGlobalData.mSummaryAndLedgerDoneOnce)
-    gGlobalData.mSummaryAndLedgerDoneOnce = ledgerReady && summaryReady;
+    gGlobalData.mSummaryAndLedgerDoneOnce = ledger_ready && summary_ready;
 
   ImGui::SetNextWindowSize(ImVec2(800, 400), ImGuiCond_FirstUseEver);
   ImGui::SetNextWindowPos(ImVec2(0, 400), ImGuiCond_FirstUseEver);
@@ -170,10 +170,10 @@ void PortfolioUI()
   if (gGlobalData.mSummaryAndLedgerDoneOnce)
   {
     ImGui::Text("Cash Balance Total SGD: %g  USD: %g  NetLiq(SGD): %g",
-                gGlobalData.mLedgerResult.summary.cashSGD,
-                gGlobalData.mLedgerResult.summary.cashUSD,
-                gGlobalData.mLedgerResult.summary.netLiquidationValSGD);
-    ImGui::Text("Buying Power SGD: %g", gGlobalData.mSummaryResult.summary.buyingPowerSGD);
+                gGlobalData.mLedgerResult.mSummary.mCashSGD,
+                gGlobalData.mLedgerResult.mSummary.mCashUSD,
+                gGlobalData.mLedgerResult.mSummary.mNetLiquidationValSGD);
+    ImGui::Text("Buying Power SGD: %g", gGlobalData.mSummaryResult.mSummary.mBuyingPowerSGD);
   }
   else
   {
@@ -181,7 +181,7 @@ void PortfolioUI()
     ImGui::Text("Buying Power SGD: ...");
   }
 
-  auto& positions = gGlobalData.mPositions.positions;
+  auto& positions = gGlobalData.mPositions.mPositions;
   ImGui::Text("Positions: %d", (int)positions.size());
 
   static bool traded_this_session = false;
@@ -209,38 +209,38 @@ void PortfolioUI()
       ImGui::TableNextRow();
 
       ImGui::TableNextColumn();
-      ImGui::TextWrapped(p.secType.c_str());
+      ImGui::TextWrapped(p.mSecType.c_str());
       ImGui::TableNextColumn();
-      ImGui::Text(p.assetClass.c_str());
+      ImGui::Text(p.mAssetClass.c_str());
       ImGui::TableNextColumn();
 
       char t[128] = {0};
-      snprintf(t, sizeof(t), "%g", p.size);
+      snprintf(t, sizeof(t), "%g", p.mSize);
       ImGui::Text(t);
       ImGui::TableNextColumn();
 
-      snprintf(t, sizeof(t), "%g", p.averageCost);
+      snprintf(t, sizeof(t), "%g", p.mAverageCost);
       ImGui::Text(t);
       ImGui::TableNextColumn();
 
-      snprintf(t, sizeof(t), "%g", p.marketPrice);
+      snprintf(t, sizeof(t), "%g", p.mMarketPrice);
       ImGui::Text(t);
       ImGui::TableNextColumn();
 
-      snprintf(t, sizeof(t), "%g", p.marketValue);
+      snprintf(t, sizeof(t), "%g", p.mMarketValue);
       ImGui::Text(t);
       ImGui::TableNextColumn();
 
-      snprintf(t, sizeof(t), "%g", p.realizedPNL);
+      snprintf(t, sizeof(t), "%g", p.mRealizedPNL);
       ImGui::Text(t);
       ImGui::TableNextColumn();
 
-      snprintf(t, sizeof(t), "%g", p.unrealizedPNL);
-      double unrealized_pnl_percent = p.unrealizedPNL / (p.size * p.averageCost) * 100.0;
+      snprintf(t, sizeof(t), "%g", p.mUnrealizedPNL);
+      double unrealized_pnl_percent = p.mUnrealizedPNL / (p.mSize * p.mAverageCost) * 100.0;
       char buf[128] = {0};
       snprintf(buf, sizeof(buf), "%.3g", unrealized_pnl_percent);
 
-      if (p.unrealizedPNL > 0.0)
+      if (p.mUnrealizedPNL > 0.0)
       {
         ImGui::TextColored(ImVec4(0, 1, 0, 1), t);
         ImGui::TableNextColumn();
@@ -260,42 +260,42 @@ void PortfolioUI()
       {
         gGlobalData.mPendingCloseOrders.push_back({});
         auto& cod = gGlobalData.mPendingCloseOrders.back();
-        cod.conid = p.conid;
-        cod.buy = p.size < 0.0;
-        cod.symbol = p.symbol;
-        double qty = p.size;
+        cod.mConid = p.mConid;
+        cod.mBuy = p.mSize < 0.0;
+        cod.mSymbol = p.mSymbol;
+        double qty = p.mSize;
         if (qty < 0)
           qty = -qty;
-        cod.quantity = qty * 1.0;
-        cod.coroHandle = create_managed_coroutine(PostCloseOrder, &cod);
+        cod.mQuantity = qty * 1.0;
+        cod.mCoroHandle = create_managed_coroutine(PostCloseOrder, &cod);
       }
       ImGui::SameLine();
       if (ImGui::Button("Close 50%"))
       {
         gGlobalData.mPendingCloseOrders.push_back({});
         auto& cod = gGlobalData.mPendingCloseOrders.back();
-        cod.conid = p.conid;
-        cod.buy = p.size < 0.0;
-        cod.symbol = p.symbol;
-        double qty = p.size;
+        cod.mConid = p.mConid;
+        cod.mBuy = p.mSize < 0.0;
+        cod.mSymbol = p.mSymbol;
+        double qty = p.mSize;
         if (qty < 0)
           qty = -qty;
-        cod.quantity = qty * 0.55;
-        cod.coroHandle = create_managed_coroutine(PostCloseOrder, &cod);
+        cod.mQuantity = qty * 0.55;
+        cod.mCoroHandle = create_managed_coroutine(PostCloseOrder, &cod);
       }
       ImGui::SameLine();
       if (ImGui::Button("Close 33%"))
       {
         gGlobalData.mPendingCloseOrders.push_back({});
         auto& cod = gGlobalData.mPendingCloseOrders.back();
-        cod.conid = p.conid;
-        cod.buy = p.size < 0.0;
-        cod.symbol = p.symbol;
-        double qty = p.size;
+        cod.mConid = p.mConid;
+        cod.mBuy = p.mSize < 0.0;
+        cod.mSymbol = p.mSymbol;
+        double qty = p.mSize;
         if (qty < 0)
           qty = -qty;
-        cod.quantity = qty * 0.33;
-        cod.coroHandle = create_managed_coroutine(PostCloseOrder, &cod);
+        cod.mQuantity = qty * 0.33;
+        cod.mCoroHandle = create_managed_coroutine(PostCloseOrder, &cod);
       }
 
       if (ImGui::Button("SL")) {}
@@ -304,7 +304,7 @@ void PortfolioUI()
     ImGui::EndTable();
   }
 
-  if (positions.empty() && posCoroHandle != -1)
+  if (positions.empty() && pos_coro_handle != -1)
   {
     ImGui::TextColored(ImVec4(1, 1, 0, 1), "Loading positions...");
   }
@@ -398,20 +398,20 @@ void TickerTooltip(const std::vector<MarketDataPoint>& data, const std::vector<d
       ImGui::Text("%s", buff);
       ImGui::Text("Open:");
       ImGui::SameLine(60);
-      ImGui::Text("$%.2f", data[idx].open);
+      ImGui::Text("$%.2f", data[idx].mOpen);
       ImGui::Text("Close:");
       ImGui::SameLine(60);
-      ImGui::Text("$%.2f", data[idx].close);
+      ImGui::Text("$%.2f", data[idx].mClose);
       ImGui::Text("High:");
       ImGui::SameLine(60);
-      ImGui::Text("$%.2f", data[idx].high);
+      ImGui::Text("$%.2f", data[idx].mHigh);
       ImGui::Text("Low:");
       ImGui::SameLine(60);
-      ImGui::Text("$%.2f", data[idx].low);
+      ImGui::Text("$%.2f", data[idx].mLow);
       ImGui::Text("Volume:");
       ImGui::SameLine(60);
       char buf[64] = {};
-      VolumeFormatter(data[idx].volume, buf, sizeof(buf), nullptr);
+      VolumeFormatter(data[idx].mVolume, buf, sizeof(buf), nullptr);
       ImGui::Text(buf);
       ImGui::EndTooltip();
     }
@@ -446,34 +446,34 @@ static int IBKRTimeStrToLocalTime(const char* ts, char* buf, int buf_sz)
 void OrderWindowUI()
 {
   static OrdersResult ordersResult;
-  static int ordersCoroHandle = -1;
-  static float ordersRefreshTimer = -1.0f;
+  static int orders_coro_handle = -1;
+  static float orders_refresh_timer = -1.0f;
 
-  if (ordersRefreshTimer < 0.f)
+  if (orders_refresh_timer < 0.f)
   {
-    if (ordersCoroHandle == -1)
+    if (orders_coro_handle == -1)
     {
       ordersResult = OrdersResult();
-      ordersCoroHandle = create_managed_coroutine(PollOrders, &ordersResult);
+      orders_coro_handle = create_managed_coroutine(PollOrders, &ordersResult);
     }
     else
     {
-      mco_coro* co = get_coroutine(ordersCoroHandle);
+      mco_coro* co = get_coroutine(orders_coro_handle);
       if (!co || mco_status(co) == MCO_DEAD)
       {
-        destroy_coroutine(ordersCoroHandle);
-        ordersCoroHandle = -1;
-        ordersRefreshTimer = 0.0f;
+        destroy_coroutine(orders_coro_handle);
+        orders_coro_handle = -1;
+        orders_refresh_timer = 0.0f;
       }
     }
   }
   else
   {
-    ordersRefreshTimer += ImGui::GetIO().DeltaTime;
-    if (ordersRefreshTimer >= 5.0f)
+    orders_refresh_timer += ImGui::GetIO().DeltaTime;
+    if (orders_refresh_timer >= 5.0f)
     {
-      ordersCoroHandle = create_managed_coroutine(PollOrders, &ordersResult);
-      ordersRefreshTimer = 0.0f;
+      orders_coro_handle = create_managed_coroutine(PollOrders, &ordersResult);
+      orders_refresh_timer = 0.0f;
     }
   }
 
@@ -503,11 +503,11 @@ void OrderWindowUI()
         return status == "Filled" || status == "Cancelled" || status == "Inactive";
       };
 
-      for (int i = 0; i < (int)ordersResult.orders.size(); ++i)
+      for (int i = 0; i < (int)ordersResult.mOrders.size(); ++i)
       {
-        auto& o = ordersResult.orders[i];
+        auto& o = ordersResult.mOrders[i];
 
-        if (show_open_orders_only && non_open_order(o.status))
+        if (show_open_orders_only && non_open_order(o.mStatus))
           continue;
 
         ImGui::TableNextRow();
@@ -515,37 +515,37 @@ void OrderWindowUI()
         ImGui::TableNextColumn();
         {
           char buf[32] = {};
-          IBKRTimeStrToLocalTime(o.lastExecutionTime.c_str(), buf, sizeof(buf));
+          IBKRTimeStrToLocalTime(o.mLastExecutionTime.c_str(), buf, sizeof(buf));
           ImGui::TextWrapped("%s", buf);
         }
 
         ImGui::TableNextColumn();
-        ImGui::Text(o.symbol.c_str());
+        ImGui::Text(o.mSymbol.c_str());
         ImGui::TableNextColumn();
-        ImGui::Text(o.side.c_str());
+        ImGui::Text(o.mSide.c_str());
         ImGui::TableNextColumn();
-        ImGui::Text(o.orderType.c_str());
+        ImGui::Text(o.mOrderType.c_str());
         ImGui::TableNextColumn();
 
         char t[64] = {0};
-        snprintf(t, sizeof(t), "%g/%g", o.filledQuantity, o.totalSize);
+        snprintf(t, sizeof(t), "%g/%g", o.mFilledQuantity, o.mTotalSize);
         ImGui::Text(t);
         ImGui::TableNextColumn();
 
-        snprintf(t, sizeof(t), "%.2f", o.limitPrice);
+        snprintf(t, sizeof(t), "%.2f", o.mLimitPrice);
         ImGui::Text(t);
         ImGui::TableNextColumn();
 
-        snprintf(t, sizeof(t), "%.2f", o.stopPrice);
+        snprintf(t, sizeof(t), "%.2f", o.mStopPrice);
         ImGui::Text(t);
 
         ImGui::TableNextColumn();
-        ImGui::Text(o.status.c_str());
+        ImGui::Text(o.mStatus.c_str());
 
         ImGui::TableNextColumn();
-        if (!non_open_order(o.status))
+        if (!non_open_order(o.mStatus))
         {
-          auto it = gGlobalData.mPendingCancels.find(o.orderId);
+          auto it = gGlobalData.mPendingCancels.find(o.mOrderId);
           bool cancelling = it != gGlobalData.mPendingCancels.end();
           ImGui::PushID(i);
           if (!cancelling)
@@ -553,86 +553,86 @@ void OrderWindowUI()
             if (ImGui::Button("Cancel"))
             {
               CancelOrderData pc;
-              pc.orderId = o.orderId;
-              pc.coroHandle = create_managed_coroutine(CancelOrder, (void*)o.orderId);
-              gGlobalData.mPendingCancels[o.orderId] = pc;
+              pc.mOrderId = o.mOrderId;
+              pc.mCoroHandle = create_managed_coroutine(CancelOrder, (void*)o.mOrderId);
+              gGlobalData.mPendingCancels[o.mOrderId] = pc;
             }
 
-            auto it = gGlobalData.mSnapshotBidAskLast.find(o.conid);
+            auto it = gGlobalData.mSnapshotBidAskLast.find(o.mConid);
             if (it != gGlobalData.mSnapshotBidAskLast.end())
             {
               SnapshotPriceData pricedata = it->second;
-              float mid = (pricedata.bid + pricedata.ask) * 0.5f;
+              float mid = (pricedata.mBid + pricedata.mAsk) * 0.5f;
               float offset = 0.f; // for testing, should nvr execute
               
               if (ImGui::Button("Mid")) 
               {
                 gGlobalData.mPendingModifies.push_back({});
                 auto& mod = gGlobalData.mPendingModifies.back();
-                mod.orderId = o.orderId;
-                mod.conid = o.conid;
-                mod.symbol = o.symbol;
-                mod.side = o.side;
-                mod.orderType = o.orderType;
-                mod.newPrice = mid - offset;
-                mod.newQuantity = o.totalSize;
-                mod.coroHandle = create_managed_coroutine(PostModifyOrder, &mod);
+                mod.mOrderId = o.mOrderId;
+                mod.mConid = o.mConid;
+                mod.mSymbol = o.mSymbol;
+                mod.mSide = o.mSide;
+                mod.mOrderType = o.mOrderType;
+                mod.mNewPrice = mid - offset;
+                mod.mNewQuantity = o.mTotalSize;
+                mod.mCoroHandle = create_managed_coroutine(PostModifyOrder, &mod);
               }
 
               if (ImGui::Button("Ask")) 
               {
                 gGlobalData.mPendingModifies.push_back({});
                 auto& mod = gGlobalData.mPendingModifies.back();
-                mod.orderId = o.orderId;
-                mod.conid = o.conid;
-                mod.symbol = o.symbol;
-                mod.side = o.side;
-                mod.orderType = o.orderType;
-                mod.newPrice = pricedata.ask - offset;
-                mod.newQuantity = o.totalSize;
-                mod.coroHandle = create_managed_coroutine(PostModifyOrder, &mod);
+                mod.mOrderId = o.mOrderId;
+                mod.mConid = o.mConid;
+                mod.mSymbol = o.mSymbol;
+                mod.mSide = o.mSide;
+                mod.mOrderType = o.mOrderType;
+                mod.mNewPrice = pricedata.mAsk - offset;
+                mod.mNewQuantity = o.mTotalSize;
+                mod.mCoroHandle = create_managed_coroutine(PostModifyOrder, &mod);
               }
               ImGui::SameLine();
               if (ImGui::Button("Bid"))
               {
                 gGlobalData.mPendingModifies.push_back({});
                 auto& mod = gGlobalData.mPendingModifies.back();
-                mod.orderId = o.orderId;
-                mod.conid = o.conid;
-                mod.symbol = o.symbol;
-                mod.side = o.side;
-                mod.orderType = o.orderType;
-                mod.newPrice = pricedata.bid - offset;
-                mod.newQuantity = o.totalSize;
-                mod.coroHandle = create_managed_coroutine(PostModifyOrder, &mod);
+                mod.mOrderId = o.mOrderId;
+                mod.mConid = o.mConid;
+                mod.mSymbol = o.mSymbol;
+                mod.mSide = o.mSide;
+                mod.mOrderType = o.mOrderType;
+                mod.mNewPrice = pricedata.mBid - offset;
+                mod.mNewQuantity = o.mTotalSize;
+                mod.mCoroHandle = create_managed_coroutine(PostModifyOrder, &mod);
               }
 
               if (ImGui::Button("75% Ask")) 
               {
                 gGlobalData.mPendingModifies.push_back({});
                 auto& mod = gGlobalData.mPendingModifies.back();
-                mod.orderId = o.orderId;
-                mod.conid = o.conid;
-                mod.symbol = o.symbol;
-                mod.side = o.side;
-                mod.orderType = o.orderType;
-                mod.newPrice = (mid + pricedata.ask) * 0.5f - offset;
-                mod.newQuantity = o.totalSize;
-                mod.coroHandle = create_managed_coroutine(PostModifyOrder, &mod);
+                mod.mOrderId = o.mOrderId;
+                mod.mConid = o.mConid;
+                mod.mSymbol = o.mSymbol;
+                mod.mSide = o.mSide;
+                mod.mOrderType = o.mOrderType;
+                mod.mNewPrice = (mid + pricedata.mAsk) * 0.5f - offset;
+                mod.mNewQuantity = o.mTotalSize;
+                mod.mCoroHandle = create_managed_coroutine(PostModifyOrder, &mod);
               }
               ImGui::SameLine();
               if (ImGui::Button("25% Bid")) 
               {
                 gGlobalData.mPendingModifies.push_back({});
                 auto& mod = gGlobalData.mPendingModifies.back();
-                mod.orderId = o.orderId;
-                mod.conid = o.conid;
-                mod.symbol = o.symbol;
-                mod.side = o.side;
-                mod.orderType = o.orderType;
-                mod.newPrice = (mid + pricedata.bid) * 0.5f - offset;
-                mod.newQuantity = o.totalSize;
-                mod.coroHandle = create_managed_coroutine(PostModifyOrder, &mod);
+                mod.mOrderId = o.mOrderId;
+                mod.mConid = o.mConid;
+                mod.mSymbol = o.mSymbol;
+                mod.mSide = o.mSide;
+                mod.mOrderType = o.mOrderType;
+                mod.mNewPrice = (mid + pricedata.mBid) * 0.5f - offset;
+                mod.mNewQuantity = o.mTotalSize;
+                mod.mCoroHandle = create_managed_coroutine(PostModifyOrder, &mod);
               }
             }
           }
@@ -650,11 +650,11 @@ void OrderWindowUI()
       ImGui::EndTable();
     }
 
-    if (ordersResult.orders.empty() && ordersCoroHandle != -1)
+    if (ordersResult.mOrders.empty() && orders_coro_handle != -1)
     {
       ImGui::TextColored(ImVec4(1, 1, 0, 1), "Loading orders...");
     }
-    else if (ordersResult.orders.empty() && ordersCoroHandle == -1)
+    else if (ordersResult.mOrders.empty() && orders_coro_handle == -1)
     {
       ImGui::TextColored(ImVec4(1, 1, 0, 1), "No orders");
     }
@@ -664,14 +664,14 @@ void OrderWindowUI()
   for (auto it = gGlobalData.mPendingCancels.begin(); it != gGlobalData.mPendingCancels.end();)
   {
     auto& pc = it->second;
-    mco_coro* co = get_coroutine(pc.coroHandle);
+    mco_coro* co = get_coroutine(pc.mCoroHandle);
     if (!co || mco_status(co) == MCO_DEAD)
     {
-      destroy_coroutine(pc.coroHandle);
-      if (pc.success)
-        printf("Order %d cancelled successfully\n", pc.orderId);
+      destroy_coroutine(pc.mCoroHandle);
+      if (pc.mSuccess)
+        printf("Order %d cancelled successfully\n", pc.mOrderId);
       else
-        printf("Failed to cancel order %d\n", pc.orderId);
+        printf("Failed to cancel order %d\n", pc.mOrderId);
       it = gGlobalData.mPendingCancels.erase(it);
     }
     else
@@ -683,22 +683,22 @@ void OrderWindowUI()
   for (auto it = gGlobalData.mPendingModifies.begin(); it != gGlobalData.mPendingModifies.end();)
   {
     auto& mod = *it;
-    if (mod.coroHandle != -1)
+    if (mod.mCoroHandle != -1)
     {
-      mco_coro* co = get_coroutine(mod.coroHandle);
+      mco_coro* co = get_coroutine(mod.mCoroHandle);
       if (!co || mco_status(co) == MCO_DEAD)
       {
-        destroy_coroutine(mod.coroHandle);
-        mod.coroHandle = -1;
+        destroy_coroutine(mod.mCoroHandle);
+        mod.mCoroHandle = -1;
       }
     }
-    if (mod.coroHandle == -1)
+    if (mod.mCoroHandle == -1)
     {
-      if (mod.success)
-        printf("Order %d modified successfully (ID: %s, status: %s)\n", mod.orderId,
-               mod.order_id.c_str(), mod.order_status.c_str());
+      if (mod.mSuccess)
+        printf("Order %d modified successfully (ID: %s, status: %s)\n", mod.mOrderId,
+               mod.mAssignedOrderId.c_str(), mod.mOrderStatus.c_str());
       else
-        printf("Failed to modify order %d: %s\n", mod.orderId, mod.order_status.c_str());
+        printf("Failed to modify order %d: %s\n", mod.mOrderId, mod.mOrderStatus.c_str());
       it = gGlobalData.mPendingModifies.erase(it);
     }
     else
@@ -727,13 +727,13 @@ void FreshOrderWindowUI()
     float bid = 0.f, ask = 0.f, last = 0.f;
     int conid = gGlobalData.mPlaceOrderConid;
     if (gGlobalData.mSnapshotBidAskLast.count(conid) &&
-        gGlobalData.mSnapshotBidAskLast[conid].timestamp != 0)
+        gGlobalData.mSnapshotBidAskLast[conid].mTimestamp != 0)
     {
       auto& price = gGlobalData.mSnapshotBidAskLast[conid];
-      bid = price.bid;
-      ask = price.ask;
-      last = price.last;
-      ImGui::Text("Bid: %.2f  |  Ask: %.2f  |  Last: %.2f", price.bid, price.ask, price.last);
+      bid = price.mBid;
+      ask = price.mAsk;
+      last = price.mLast;
+      ImGui::Text("Bid: %.2f  |  Ask: %.2f  |  Last: %.2f", price.mBid, price.mAsk, price.mLast);
     }
     else
     {
@@ -790,7 +790,7 @@ void FreshOrderWindowUI()
     static float stop_loss_prices[3] = {0.f, 0.f, 0.f};
     static int stop_loss_quantity[3] = {0, 0, 0};
 
-    auto round2decimals = [](float x)
+    auto round_to_2_decimals = [](float x)
     {
       return std::round(x * 100.0) / 100.0;
     };
@@ -802,16 +802,16 @@ void FreshOrderWindowUI()
         ImGui::Text("Set price to : ");
         ImGui::SameLine();
         if (ImGui::Button("Bid"))
-          price = round2decimals(bid);
+          price = round_to_2_decimals(bid);
         ImGui::SameLine();
         if (ImGui::Button("Mid"))
-          price = round2decimals((bid + ask) * 0.5f);
+          price = round_to_2_decimals((bid + ask) * 0.5f);
         ImGui::SameLine();
         if (ImGui::Button("Ask"))
-          price = round2decimals(ask);
+          price = round_to_2_decimals(ask);
         ImGui::SameLine();
         if (ImGui::Button("Last"))
-          price = round2decimals(last);
+          price = round_to_2_decimals(last);
 
         ImGui::NewLine();
 
@@ -852,30 +852,30 @@ void FreshOrderWindowUI()
         {
           gGlobalData.mPendingPostOrders.push_back({});
           auto& pod = gGlobalData.mPendingPostOrders.back();
-          pod.conid = gGlobalData.mPlaceOrderConid;
+          pod.mConid = gGlobalData.mPlaceOrderConid;
 
-          pod.orders.push_back({});
-          auto& main_order = pod.orders.back();
-          main_order.orderType = current_order_type;
-          main_order.buy = current_action == "BUY";
-          main_order.quantity = (float)quantity;
-          main_order.price = price;
+          pod.mOrders.push_back({});
+          auto& main_order = pod.mOrders.back();
+          main_order.mOrderType = current_order_type;
+          main_order.mBuy = current_action == "BUY";
+          main_order.mQuantity = (float)quantity;
+          main_order.mPrice = price;
 
           if (current_sl_option > 0)
           {
             int sl_count = current_sl_option == 1 ? 2 : 3;
             for (int i = 0; i < sl_count; i++)
             {
-              pod.orders.push_back({});
-              auto& sl_order = pod.orders.back();
-              sl_order.orderType = "STP";
-              sl_order.buy = !main_order.buy;
-              sl_order.quantity = stop_loss_quantity[i];
-              sl_order.price = stop_loss_prices[i];
+              pod.mOrders.push_back({});
+              auto& sl_order = pod.mOrders.back();
+              sl_order.mOrderType = "STP";
+              sl_order.mBuy = !main_order.mBuy;
+              sl_order.mQuantity = stop_loss_quantity[i];
+              sl_order.mPrice = stop_loss_prices[i];
             }
           }
 
-          pod.coroHandle = create_managed_coroutine(PostOrders, &pod);
+          pod.mCoroHandle = create_managed_coroutine(PostOrders, &pod);
         }
         ImGui::Separator();
 
@@ -887,16 +887,16 @@ void FreshOrderWindowUI()
         ImGui::Text("Set price to : ");
         ImGui::SameLine();
         if (ImGui::Button("Bid"))
-          price = round2decimals(bid);
+          price = round_to_2_decimals(bid);
         ImGui::SameLine();
         if (ImGui::Button("Mid"))
-          price = round2decimals((bid + ask) * 0.5f);
+          price = round_to_2_decimals((bid + ask) * 0.5f);
         ImGui::SameLine();
         if (ImGui::Button("Ask"))
-          price = round2decimals(ask);
+          price = round_to_2_decimals(ask);
         ImGui::SameLine();
         if (ImGui::Button("Last"))
-          price = round2decimals(last);
+          price = round_to_2_decimals(last);
 
         ImGui::NewLine();
 
@@ -934,14 +934,14 @@ void FreshOrderWindowUI()
         {
           gGlobalData.mPendingPostOrders.push_back({});
           auto& pod = gGlobalData.mPendingPostOrders.back();
-          pod.conid = gGlobalData.mPlaceOrderConid;
+          pod.mConid = gGlobalData.mPlaceOrderConid;
 
-          pod.orders.push_back({});
-          auto& main_order = pod.orders.back();
-          main_order.orderType = current_order_type;
-          main_order.buy = current_action == "BUY";
-          main_order.quantity = (float)quantity;
-          main_order.price = price;
+          pod.mOrders.push_back({});
+          auto& main_order = pod.mOrders.back();
+          main_order.mOrderType = current_order_type;
+          main_order.mBuy = current_action == "BUY";
+          main_order.mQuantity = (float)quantity;
+          main_order.mPrice = price;
 
           if (current_sl_option > 0)
           {
@@ -949,24 +949,24 @@ void FreshOrderWindowUI()
             if (sl_count > 0)
             {
               char buf[32] = {};
-              snprintf(buf, sizeof(buf), "MainOrder-%d", pod.conid);
-              pod.orders[0].cOID = buf;
+              snprintf(buf, sizeof(buf), "MainOrder-%d", pod.mConid);
+              pod.mOrders[0].mCOID = buf;
             }
             int q_step = quantity / sl_count;
             for (int i = 0; i < sl_count; i++)
             {
-              pod.orders.push_back({});
-              auto& sl_order = pod.orders.back();
-              sl_order.orderType = "STP";
-              sl_order.buy = !main_order.buy;
+              pod.mOrders.push_back({});
+              auto& sl_order = pod.mOrders.back();
+              sl_order.mOrderType = "STP";
+              sl_order.mBuy = !main_order.mBuy;
 
-              sl_order.price = stop_loss_prices[i];
-              sl_order.quantity = stop_loss_quantity[i];
-              sl_order.parentId = main_order.cOID;
+              sl_order.mPrice = stop_loss_prices[i];
+              sl_order.mQuantity = stop_loss_quantity[i];
+              sl_order.mParentId = main_order.mCOID;
             }
           }
 
-          pod.coroHandle = create_managed_coroutine(PostOrders, &pod);
+          pod.mCoroHandle = create_managed_coroutine(PostOrders, &pod);
         }
         ImGui::Separator();
 
@@ -986,29 +986,29 @@ void FreshOrderWindowUI()
       {
         ++idx;
         ImGui::PushID(idx);
-        if (pod.coroHandle != -1)
+        if (pod.mCoroHandle != -1)
         {
           ImGui::TextColored(ImVec4(1, 1, 0, 1), "Batch #%d: submitting (%zu orders)...", idx,
-                             pod.orders.size());
+                             pod.mOrders.size());
         }
         else
         {
-          for (size_t oi = 0; oi < pod.orders.size(); oi++)
+          for (size_t oi = 0; oi < pod.mOrders.size(); oi++)
           {
-            ImGui::Text("  %s %s x%.0f @ ", pod.orders[oi].buy ? "BUY" : "SELL",
-                        pod.orders[oi].orderType.c_str(), pod.orders[oi].quantity);
+            ImGui::Text("  %s %s x%.0f @ ", pod.mOrders[oi].mBuy ? "BUY" : "SELL",
+                        pod.mOrders[oi].mOrderType.c_str(), pod.mOrders[oi].mQuantity);
             ImGui::SameLine();
-            if (oi < pod.order_ids.size())
+            if (oi < pod.mAssignedOrderIds.size())
             {
-              if (!pod.order_ids[oi].empty())
+              if (!pod.mAssignedOrderIds[oi].empty())
               {
-                ImGui::TextColored(ImVec4(0, 1, 0, 1), "OK (ID: %s, %s)", pod.order_ids[oi].c_str(),
-                                   pod.order_statuses[oi].c_str());
+                ImGui::TextColored(ImVec4(0, 1, 0, 1), "OK (ID: %s, %s)", pod.mAssignedOrderIds[oi].c_str(),
+                                   pod.mOrderStatuses[oi].c_str());
               }
               else
               {
                 ImGui::TextColored(ImVec4(1, 0, 0, 1), "FAILED - %s",
-                                   pod.order_statuses[oi].c_str());
+                                   pod.mOrderStatuses[oi].c_str());
               }
             }
             else
@@ -1032,20 +1032,20 @@ void FreshOrderWindowUI()
       {
         ++idx;
         ImGui::PushID(idx);
-        ImGui::Text("%s ", cod.symbol.c_str());
+        ImGui::Text("%s ", cod.mSymbol.c_str());
         ImGui::SameLine();
-        if (cod.coroHandle != -1)
+        if (cod.mCoroHandle != -1)
         {
           ImGui::TextColored(ImVec4(1, 1, 0, 1), "fetching snapshot...");
         }
-        else if (cod.success)
+        else if (cod.mSuccess)
         {
-          ImGui::TextColored(ImVec4(0, 1, 0, 1), "OK (ID: %s, status: %s)", cod.order_id.c_str(),
-                             cod.order_status.c_str());
+          ImGui::TextColored(ImVec4(0, 1, 0, 1), "OK (ID: %s, status: %s)", cod.mAssignedOrderId.c_str(),
+                             cod.mOrderStatus.c_str());
         }
-        else if (!cod.order_status.empty())
+        else if (!cod.mOrderStatus.empty())
         {
-          ImGui::TextColored(ImVec4(1, 0, 0, 1), "FAILED - %s", cod.order_status.c_str());
+          ImGui::TextColored(ImVec4(1, 0, 0, 1), "FAILED - %s", cod.mOrderStatus.c_str());
         }
         else
         {
@@ -1062,7 +1062,7 @@ void FreshOrderWindowUI()
   {
     int conid = gGlobalData.mPlaceOrderConid;
 
-    if (conid != gGlobalData.mFreshOrderSnapshotResult.conid &&
+    if (conid != gGlobalData.mFreshOrderSnapshotResult.mConid &&
         gGlobalData.mFreshOrderSnapshotCoroHandle != -1)
     {
       destroy_coroutine(gGlobalData.mFreshOrderSnapshotCoroHandle);
@@ -1080,12 +1080,12 @@ void FreshOrderWindowUI()
 
     time_t now = time(NULL);
     bool stale = !gGlobalData.mSnapshotBidAskLast.count(conid) ||
-                 gGlobalData.mSnapshotBidAskLast[conid].timestamp == 0 ||
-                 now - gGlobalData.mSnapshotBidAskLast[conid].timestamp >= 5;
+                 gGlobalData.mSnapshotBidAskLast[conid].mTimestamp == 0 ||
+                 now - gGlobalData.mSnapshotBidAskLast[conid].mTimestamp >= 5;
     if (stale && gGlobalData.mFreshOrderSnapshotCoroHandle == -1)
     {
       //printf("Starting snapshot coro for conid %d\n", conid);
-      gGlobalData.mFreshOrderSnapshotResult.conid = conid;
+      gGlobalData.mFreshOrderSnapshotResult.mConid = conid;
       gGlobalData.mFreshOrderSnapshotCoroHandle =
         create_managed_coroutine(PollMarketDataSnapshot, &gGlobalData.mFreshOrderSnapshotResult);
     }
@@ -1096,26 +1096,26 @@ void FreshOrderWindowUI()
        it != gGlobalData.mPendingPostOrders.end();)
   {
     auto& pod = *it;
-    if (pod.coroHandle != -1)
+    if (pod.mCoroHandle != -1)
     {
-      mco_coro* co = get_coroutine(pod.coroHandle);
+      mco_coro* co = get_coroutine(pod.mCoroHandle);
       if (!co || mco_status(co) == MCO_DEAD)
       {
-        destroy_coroutine(pod.coroHandle);
-        pod.coroHandle = -1;
+        destroy_coroutine(pod.mCoroHandle);
+        pod.mCoroHandle = -1;
       }
     }
-    if (pod.coroHandle == -1)
+    if (pod.mCoroHandle == -1)
     {
-      if (pod.success)
+      if (pod.mSuccess)
       {
-        for (size_t oi = 0; oi < pod.order_ids.size(); oi++)
-          printf("Order [%zu] OK: ID=%s status=%s\n", oi, pod.order_ids[oi].c_str(),
-                 pod.order_statuses[oi].c_str());
+        for (size_t oi = 0; oi < pod.mAssignedOrderIds.size(); oi++)
+          printf("Order [%zu] OK: ID=%s status=%s\n", oi, pod.mAssignedOrderIds[oi].c_str(),
+                 pod.mOrderStatuses[oi].c_str());
       }
-      else if (!pod.order_statuses.empty())
+      else if (!pod.mOrderStatuses.empty())
       {
-        for (auto& s : pod.order_statuses)
+        for (auto& s : pod.mOrderStatuses)
           printf("Order submission failed! Error: %s\n", s.c_str());
       }
       it = gGlobalData.mPendingPostOrders.erase(it);
@@ -1135,14 +1135,14 @@ void PlotStockChart(const std::vector<MarketDataPoint>& data)
   static float ratios[] = {2, 1};
   if (ImPlot::BeginSubplots("##Stocks", 2, 1, ImVec2(-1, -1), ImPlotSubplotFlags_LinkCols, ratios))
   {
-    ImVec4 greenc(0, 1, 0, 1), redc(1, 0, 0, 1);
+    ImVec4 green_c(0, 1, 0, 1), red_c(1, 0, 0, 1);
     std::vector<double> time, volume, open, close;
     for (int i = 0; i < data.size(); ++i)
     {
-      time.push_back(data[i].timestamp);
-      volume.push_back(data[i].volume);
-      open.push_back(data[i].open);
-      close.push_back(data[i].close);
+      time.push_back(data[i].mTimestamp);
+      volume.push_back(data[i].mVolume);
+      open.push_back(data[i].mOpen);
+      close.push_back(data[i].mClose);
     }
 
     if (ImPlot::BeginPlot("##OHLCPlot"))
@@ -1151,7 +1151,7 @@ void PlotStockChart(const std::vector<MarketDataPoint>& data)
                         ImPlotAxisFlags_AutoFit | ImPlotAxisFlags_RangeFit |
                           ImPlotAxisFlags_Opposite);
       ImPlot::SetupAxisScale(ImAxis_X1, ImPlotScale_Linear);
-      ImPlot::SetupAxisLimits(ImAxis_X1, data[0].timestamp, data.back().timestamp,
+      ImPlot::SetupAxisLimits(ImAxis_X1, data[0].mTimestamp, data.back().mTimestamp,
                               ImGuiCond_Always);
       ImPlot::SetupAxisFormat(ImAxis_X1, TimeStampFormatter, nullptr);
       ImPlot::SetupAxisFormat(ImAxis_Y1, "$%.2f");
@@ -1176,26 +1176,26 @@ void PlotStockChart(const std::vector<MarketDataPoint>& data)
         if (ImPlot::BeginItem("Stk"))
         {
           // override legend icon color
-          ImPlot::GetCurrentItem()->Color = ImGui::GetColorU32(greenc);
+          ImPlot::GetCurrentItem()->Color = ImGui::GetColorU32(green_c);
           // fit data if requested
           if (ImPlot::FitThisFrame())
           {
             for (int i = 0; i < data.size(); ++i)
             {
-              ImPlot::FitPoint(ImPlotPoint(data[i].timestamp, data[i].low));
-              ImPlot::FitPoint(ImPlotPoint(data[i].timestamp, data[i].high));
+              ImPlot::FitPoint(ImPlotPoint(data[i].mTimestamp, data[i].mLow));
+              ImPlot::FitPoint(ImPlotPoint(data[i].mTimestamp, data[i].mHigh));
             }
           }
           // render data
           for (int i = 0; i < data.size(); ++i)
           {
-            ImU32 color = ImGui::GetColorU32(data[i].open > data[i].close ? redc : greenc);
-            ImVec2 open_pos = ImPlot::PlotToPixels(data[i].timestamp - half_width, data[i].open);
-            ImVec2 close_pos = ImPlot::PlotToPixels(data[i].timestamp + half_width, data[i].close);
+            ImU32 color = ImGui::GetColorU32(data[i].mOpen > data[i].mClose ? red_c : green_c);
+            ImVec2 open_pos = ImPlot::PlotToPixels(data[i].mTimestamp - half_width, data[i].mOpen);
+            ImVec2 close_pos = ImPlot::PlotToPixels(data[i].mTimestamp + half_width, data[i].mClose);
             draw_list->AddRectFilled(open_pos, close_pos, color);
 
-            ImVec2 low_pos = ImPlot::PlotToPixels(data[i].timestamp, data[i].low);
-            ImVec2 high_pos = ImPlot::PlotToPixels(data[i].timestamp, data[i].high);
+            ImVec2 low_pos = ImPlot::PlotToPixels(data[i].mTimestamp, data[i].mLow);
+            ImVec2 high_pos = ImPlot::PlotToPixels(data[i].mTimestamp, data[i].mHigh);
             draw_list->AddLine(low_pos, high_pos, color,
                                ImMax(1.0f, ImAbs(open_pos.x - close_pos.x) / 10.0f));
           }
@@ -1215,7 +1215,7 @@ void PlotStockChart(const std::vector<MarketDataPoint>& data)
       if (close_idx == -1)
         close_idx = time.size() - 1;
       double close_val = close[close_idx];
-      ImPlot::TagY(close_val, open[close_idx] < close[close_idx] ? greenc : redc);
+      ImPlot::TagY(close_val, open[close_idx] < close[close_idx] ? green_c : red_c);
 
       ImPlot::EndPlot();
     }  // OHLC plot
@@ -1288,28 +1288,28 @@ void MainState()
     ImGui::EndMainMenuBar();
   }
 
-  static bool accountsDone = false;
-  static int accountCoroHandle = -1;
+  static bool accounts_done = false;
+  static int account_coro_handle = -1;
   static AccountIdResult accountIdResult;
-  if (!accountsDone)
+  if (!accounts_done)
   {
-    if (accountCoroHandle == -1)
+    if (account_coro_handle == -1)
     {
       accountIdResult = AccountIdResult();
-      accountCoroHandle = create_managed_coroutine(PollAccountId, &accountIdResult);
+      account_coro_handle = create_managed_coroutine(PollAccountId, &accountIdResult);
     }
     else
     {
-      mco_coro* co = get_coroutine(accountCoroHandle);
+      mco_coro* co = get_coroutine(account_coro_handle);
       if (!co || mco_status(co) == MCO_DEAD)
       {
-        if (accountIdResult.success)
+        if (accountIdResult.mSuccess)
         {
-          gGlobalData.mAccountId = accountIdResult.accountId;
-          accountsDone = true;
+          gGlobalData.mAccountId = accountIdResult.mAccountId;
+          accounts_done = true;
         }
-        destroy_coroutine(accountCoroHandle);
-        accountCoroHandle = -1;
+        destroy_coroutine(account_coro_handle);
+        account_coro_handle = -1;
       }
     }
   }
@@ -1325,8 +1325,8 @@ void MainState()
     ImGui::SetNextWindowPos(ImVec2(800, 0), ImGuiCond_FirstUseEver);
     ImGui::Begin("Contract Search");
 
-    static ConIdResult conIdResult;
-    static int conidCoroHandle = -1;
+    static ConIdResult con_id_result;
+    static int conid_coro_handle = -1;
     static std::string ticker_result = "";
     static std::string full_stockname;
     static char symbol[64] = {0};
@@ -1337,22 +1337,22 @@ void MainState()
     if (changed)
     {
       ticker_result = symbol;
-      conIdResult = ConIdResult();
-      conIdResult.symbol = symbol;
-      if (conidCoroHandle != -1)
+      con_id_result = ConIdResult();
+      con_id_result.mSymbol = symbol;
+      if (conid_coro_handle != -1)
       {
-        destroy_coroutine(conidCoroHandle);
-        conidCoroHandle = -1;
+        destroy_coroutine(conid_coro_handle);
+        conid_coro_handle = -1;
       }
-      conidCoroHandle = create_managed_coroutine(PollConId, &conIdResult);
+      conid_coro_handle = create_managed_coroutine(PollConId, &con_id_result);
     }
-    else if (conidCoroHandle != -1)
+    else if (conid_coro_handle != -1)
     {
-      mco_coro* co = get_coroutine(conidCoroHandle);
+      mco_coro* co = get_coroutine(conid_coro_handle);
       if (!co || mco_status(co) == MCO_DEAD)
       {
-        destroy_coroutine(conidCoroHandle);
-        conidCoroHandle = -1;
+        destroy_coroutine(conid_coro_handle);
+        conid_coro_handle = -1;
       }
     }
 
@@ -1370,18 +1370,18 @@ void MainState()
 
       ImGui::TableHeadersRow();
 
-      for (int i = 0; i < (int)conIdResult.contracts.size(); ++i)
+      for (int i = 0; i < (int)con_id_result.mContracts.size(); ++i)
       {
-        auto& c = conIdResult.contracts[i];
+        auto& c = con_id_result.mContracts[i];
 
         ImGui::TableNextRow();
 
         ImGui::TableNextColumn();
-        ImGui::TextWrapped(c.full_stockname.c_str());
+        ImGui::TextWrapped(c.mFullStockname.c_str());
         ImGui::TableNextColumn();
-        ImGui::TextWrapped(c.exchange.c_str());
+        ImGui::TextWrapped(c.mExchange.c_str());
         ImGui::TableNextColumn();
-        ImGui::Text("%d", c.conid);
+        ImGui::Text("%d", c.mConid);
         ImGui::TableNextColumn();
 
         ImGui::PushID(i);
@@ -1391,19 +1391,19 @@ void MainState()
           bool found = false;
           for (int j = 0; j < chartheaders.size(); ++j)
           {
-            if (chartheaders[j].mConnId == c.conid)
+            if (chartheaders[j].mConnId == c.mConid)
             {
               found = true;
               break;
             }
           }
           if (!found)
-            chartheaders.push_back({c.conid, symbol, c.exchange});
+            chartheaders.push_back({c.mConid, symbol, c.mExchange});
         }
 
         if (ImGui::Button("FreshOrder", ImVec2(-1.f, 20.f)))
         {
-          gGlobalData.mPlaceOrderConid = c.conid;
+          gGlobalData.mPlaceOrderConid = c.mConid;
           gGlobalData.mPlaceOrderTicker = ticker_result;
         }
         ImGui::PopID();
@@ -1458,19 +1458,19 @@ void MainState()
           {
             StockChartData& chartData = s_chartData[conid];
 
-            if (chartData.mSnapshotResult.success)
+            if (chartData.mSnapshotResult.mSuccess)
             {
               const auto& price = gGlobalData.mSnapshotBidAskLast[conid];
-              ImGui::Text("Bid: %.2f  |  Ask: %.2f    [Last: --]", price.bid, price.ask,
-                          price.last);
+              ImGui::Text("Bid: %.2f  |  Ask: %.2f    [Last: --]", price.mBid, price.mAsk,
+                          price.mLast);
             }
             else
             {
               const auto& price = gGlobalData.mSnapshotBidAskLast[conid];
-              ImGui::Text("Bid: --  |  Ask: --    [Last: %.2f]", price.last);
+              ImGui::Text("Bid: --  |  Ask: --    [Last: %.2f]", price.mLast);
             }
 
-            PlotStockChart(chartData.mMarketDataResult.data);
+            PlotStockChart(chartData.mMarketDataResult.mData);
           }
 
           ImGui::EndTabItem();
@@ -1494,8 +1494,8 @@ void MainState()
       if (s_chartData.find(conid) == s_chartData.end())
       {
         StockChartData dat;
-        dat.mMarketDataResult.conid = conid;
-        dat.mSnapshotResult.conid = conid;
+        dat.mMarketDataResult.mConid = conid;
+        dat.mSnapshotResult.mConid = conid;
         s_chartData.insert({conid, dat});
       }
     }

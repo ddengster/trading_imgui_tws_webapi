@@ -9,34 +9,34 @@
 
 struct MarketDataPoint
 {
-  double open;
-  double high;
-  double low;
-  double close;
-  double volume;
-  double timestamp;
+  double mOpen;
+  double mHigh;
+  double mLow;
+  double mClose;
+  double mVolume;
+  double mTimestamp;
 };
 
 struct ExchContractId
 {
-  std::string full_stockname;
-  std::string exchange;
-  int conid;
+  std::string mFullStockname;
+  std::string mExchange;
+  int mConid;
 };
 
 // --- Coroutine parameter structs ---
 
 struct AccountIdResult
 {
-  std::string accountId;
-  bool success = false;
+  std::string mAccountId;
+  bool mSuccess = false;
 };
 
 struct MarketDataResult
 {
-  int conid;
-  std::vector<MarketDataPoint> data;
-  bool success = false;
+  int mConid;
+  std::vector<MarketDataPoint> mData;
+  bool mSuccess = false;
 };
 
 struct StockChartData
@@ -47,24 +47,25 @@ struct StockChartData
   int mMarketDataCoroHandle = -1;
   int mSnapshotDataCoroHandle = -1;
   float mTimer = -1.0f;
+  bool mSuccess = false;
 };
 
 struct ConIdResult
 {
-  std::string symbol;
-  std::vector<ExchContractId> contracts;
-  bool success = false;
+  std::string mSymbol;
+  std::vector<ExchContractId> mContracts;
+  bool mSuccess = false;
 };
 
 struct OrdersResult
 {
-  std::vector<OrderData> orders;
-  bool success = false;
+  std::vector<OrderData> mOrders;
+  bool mSuccess = false;
 };
 
 struct SuppressQuestionsData
 {
-  bool success = false;
+  bool mSuccess = false;
 };
 
 // --- Coroutine functions ---
