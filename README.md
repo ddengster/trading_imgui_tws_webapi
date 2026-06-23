@@ -22,6 +22,8 @@ Windows/Directx11 requirement.
 
 - Open https://localhost:5000 on a web browser, skip the ssl insecure notice. You should see a IBKR login screen, login. The message 'Client login succeeds' will be displayed if the login is successful.
 
+- Build the MSVC project in `proj/trading_imgui_tws_webapi.sln`
+
 - Run the program `bin/trading_imgui_tws_webapi.exe`. It will make webapi calls through this medium
 
 - Optionally, can test with `curl --url https://localhost:5000/v1/api/iserver/auth/status --request GET -k`
