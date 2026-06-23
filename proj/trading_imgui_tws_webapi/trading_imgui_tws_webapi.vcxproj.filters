@@ -64,6 +64,9 @@
     <ClCompile Include="..\..\src\implot\implot_items.cpp">
       <Filter>implot</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\coroutine\coroutine_mgt.cpp">
+      <Filter>coroutine</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\src\imgui.natstepfilter" />
@@ -110,6 +113,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\implot\implot_internal.h">
       <Filter>implot</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\coroutine\coroutine_mgt.h">
+      <Filter>coroutine</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
