@@ -4,6 +4,8 @@ Trading with IMGUI view. Contract search, risk-based orders, position order/mana
 
 ![](ss.PNG)
 
+*I have a version with intraday scanners, and scanners utilizing @jfsrev's methods of ATR extension, plus a number of extra features and automated trading, leave a message if you need it. It won't be free though.*
+
 TWS Documentation: https://interactivebrokers.github.io/cpwebapi/quickstart
 
 TWS Web Api: https://www.interactivebrokers.eu/campus/ibkr-api-page/cpapi-v1/#accounts
